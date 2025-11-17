@@ -46,3 +46,4 @@ bin/
 gradle/wrapper/gradle-wrapper.jar
 
 uploads/
+data/
