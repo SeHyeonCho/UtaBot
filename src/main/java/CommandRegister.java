@@ -35,8 +35,11 @@ public class CommandRegister {
                                             .addOption(INTEGER, "start", "시작 시간(초)", true)
                                             .addOption(INTEGER, "duration", "재생 길이(초)", true),
                                     Commands.slash("setuploadchannel", "이 서버의 mp3 업로드 채널을 설정합니다.")
-                                            .addOption(CHANNEL, "channel", "업로드용 텍스트 채널", true)
-                            )
+                                            .addOption(CHANNEL, "channel", "업로드용 텍스트 채널", true),
+                                    Commands.slash("setentrysong", "입장곡을 유튜브 링크로 설정합니다.")
+                                            .addOption(STRING, "url", "유튜브 또는 기타 URL", true)
+
+                                    )
                             .queue();
                 }
             }
