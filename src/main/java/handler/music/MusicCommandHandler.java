@@ -12,8 +12,8 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.managers.AudioManager;
 import util.Util;
-import util.YtdlpResolver;
 
 public class MusicCommandHandler extends ListenerAdapter {
 
@@ -39,11 +39,12 @@ public class MusicCommandHandler extends ListenerAdapter {
             event.reply("먼저 보이스 채널에 들어가 주세요!").setEphemeral(true).queue();
             return;
         }
+
         AudioChannel ch = m.getVoiceState().getChannel();
         Guild guild = event.getGuild();
         ServerMusicManager music = MusicManager.get().of(guild);
 
-        var audioManager = guild.getAudioManager();
+        AudioManager audioManager = guild.getAudioManager();
         if (!audioManager.isConnected()) {
             audioManager.setSelfDeafened(true);
             audioManager.setSendingHandler(music.sendHandler);
@@ -53,44 +54,52 @@ public class MusicCommandHandler extends ListenerAdapter {
         String q = event.getOption("query").getAsString();
         event.deferReply().queue();
 
-        YtdlpResolver.resolveAudioUrl(q).whenComplete((streamUrl, err) -> {
+
+
+        util.YtdlpResolver.resolveAudioUrl(q).whenComplete((streamUrl, err) -> {
             if (err != null) {
+                err.printStackTrace();
                 event.getHook().sendMessage("yt-dlp 로드 실패: " + err.getMessage()).queue();
                 return;
             }
 
-            MusicManager.get().playerManager().loadItemOrdered(music, streamUrl, new AudioLoadResultHandler() {
-                @Override
-                public void trackLoaded(AudioTrack track) {
-                    music.scheduler.queue(track);
-                    event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
-                }
+            MusicManager.get().playerManager().loadItemOrdered(
+                    music,
+                    streamUrl,
+                    new AudioLoadResultHandler() {
 
-                @Override
-                public void playlistLoaded(AudioPlaylist playlist) {
-                    AudioTrack first = playlist.getSelectedTrack();
-                    if (first == null && !playlist.getTracks().isEmpty()) {
-                        first = playlist.getTracks().get(0);
+                        @Override
+                        public void trackLoaded(AudioTrack track) {
+                            music.scheduler.queue(track);
+                            event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
+                        }
+
+                        @Override
+                        public void playlistLoaded(AudioPlaylist playlist) {
+                            AudioTrack first = playlist.getSelectedTrack();
+                            if (first == null && !playlist.getTracks().isEmpty()) {
+                                first = playlist.getTracks().get(0);
+                            }
+                            if (first != null) {
+                                music.scheduler.queue(first);
+                                event.getHook().sendMessage("▶️ 재생/추가: **" + first.getInfo().title + "** (플레이리스트)").queue();
+                            } else {
+                                event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
+                            }
+                        }
+
+                        @Override
+                        public void noMatches() {
+                            event.getHook().sendMessage("스트림 URL을 찾지 못했어요.").queue();
+                        }
+
+                        @Override
+                        public void loadFailed(FriendlyException e) {
+                            e.printStackTrace();
+                            event.getHook().sendMessage("로드 실패: " + e.getMessage()).queue();
+                        }
                     }
-                    if (first != null) {
-                        music.scheduler.queue(first);
-                        event.getHook().sendMessage("▶️ 재생/추가: **" + first.getInfo().title + "** (플레이리스트)").queue();
-                    } else {
-                        event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
-                    }
-                }
-
-                @Override
-                public void noMatches() {
-                    event.getHook().sendMessage("스트림 URL을 찾지 못했어요.").queue();
-                }
-
-                @Override
-                public void loadFailed(FriendlyException e) {
-                    e.printStackTrace();
-                    event.getHook().sendMessage("로드 실패: " + e.getMessage()).queue();
-                }
-            });
+            );
         });
     }
 

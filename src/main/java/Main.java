@@ -1,4 +1,6 @@
 import handler.DefaultCommandHandler;
+import handler.EntrySongHandler;
+import handler.UploadHandler;
 import handler.VoiceCommandHandler;
 import handler.music.MusicCommandHandler;
 import io.github.cdimascio.dotenv.Dotenv;
@@ -22,10 +24,13 @@ public class Main {
                 .addEventListeners(
                         new DefaultCommandHandler(),
                         new VoiceCommandHandler(),
-                        new MusicCommandHandler()
+                        new MusicCommandHandler(),
+                        new EntrySongHandler(),
+                        new UploadHandler()
                 )
                 .build();
 
+        jda.updateCommands().addCommands().queue();
         CommandRegister.registerCommand(jda);
     }
 }

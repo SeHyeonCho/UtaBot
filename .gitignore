@@ -44,3 +44,5 @@ bin/
 .env
 
 gradle/wrapper/gradle-wrapper.jar
+
+uploads/
