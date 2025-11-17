@@ -13,8 +13,10 @@ import java.nio.file.Path;
 /**
  * 길드별로 설정된 업로드 채널에서 .mp3 파일이 올라오면
  * 서버 로컬에 저장하고 해당 유저의 입장곡으로 등록하는 핸들러.
+ * (username#0000 기반 저장)
  */
 public class UploadHandler extends ListenerAdapter {
+
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
         switch (event.getName()) {
@@ -43,6 +45,7 @@ public class UploadHandler extends ListenerAdapter {
             default -> {}
         }
     }
+
     @Override
     public void onMessageReceived(MessageReceivedEvent event) {
         if (event.getAuthor().isBot()) return;
@@ -51,10 +54,7 @@ public class UploadHandler extends ListenerAdapter {
         long guildId = event.getGuild().getIdLong();
         Long uploadChannelId = UploadChannelRegistry.getUploadChannel(guildId);
 
-        // 이 서버에 업로드 채널이 아직 설정되지 않았다면 무시
         if (uploadChannelId == null) return;
-
-        // 설정된 업로드 채널이 아니면 무시
         if (event.getChannel().getIdLong() != uploadChannelId) return;
 
         var attachments = event.getMessage().getAttachments();
@@ -65,13 +65,20 @@ public class UploadHandler extends ListenerAdapter {
                 .forEach(a -> saveMp3File(event, a));
     }
 
-    private void saveMp3File(MessageReceivedEvent event, net.dv8tion.jda.api.entities.Message.Attachment file) {
+    private void saveMp3File(MessageReceivedEvent event,
+                             net.dv8tion.jda.api.entities.Message.Attachment file) {
         try {
             Path baseDir = Path.of("uploads");
             Files.createDirectories(baseDir);
 
-            User u = event.getAuthor();
-            String fileName = generateFileName(u, ".mp3");  // 예: 세현#2221.mp3
+            User user = event.getAuthor();
+
+            String username = sanitize(user.getName());
+            String discriminator = sanitize(user.getDiscriminator());
+
+            // "username#0000.mp3"
+            String fileName = username + "#" + discriminator + ".mp3";
+
             Path savePath = baseDir.resolve(fileName);
 
             file.getProxy().downloadToPath(savePath).whenComplete((v, err) -> {
@@ -80,25 +87,17 @@ public class UploadHandler extends ListenerAdapter {
                     return;
                 }
 
-                long userId = u.getIdLong();
-
-                // 기본값: 0초부터 10초 동안 재생
-                EntrySongRegistry.setSong(userId, fileName, 0, 10);
+                // 기본 재생 구간을 설정: 0~10초
+                EntrySongRegistry.setSong(username, discriminator, fileName, 0, 10);
 
                 event.getChannel().sendMessage(
-                        "🎵 `" + fileName + "` 를 입장곡으로 설정했어요! (0초 ~ 10초 재생)"
+                        "🎵 `" + fileName + "` 를 입장곡으로 설정했어요! (0초 ~ 10초)"
                 ).queue();
             });
 
         } catch (Exception e) {
             event.getChannel().sendMessage("❌ 오류: " + e.getMessage()).queue();
         }
-    }
-
-    private String generateFileName(User user, String ext) {
-        String username = sanitize(user.getName());
-        String discriminator = sanitize(user.getDiscriminator());
-        return username + "#" + discriminator + ext;
     }
 
     private String sanitize(String s) {

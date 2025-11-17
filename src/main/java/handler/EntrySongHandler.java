@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import util.EntrySongRegistry;
+import util.EntrySongConfig; // 레지스트리에서 쓰는 DTO (있다면)
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.track.*;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
@@ -27,7 +28,7 @@ public class EntrySongHandler extends ListenerAdapter {
     private static final int DEFAULT_ENTRY_DURATION_SEC = 7;
 
     // 파일명에 쓸 수 있도록 간단히 정제
-    // (넌 기존 generateFileName() 에서 쓴 sanitize 랑 규칙 맞춰주면 됨)
+    // (파일 저장할 때 사용한 sanitize 규칙과 맞춰주기)
     private String sanitize(String s) {
         return s.replaceAll("[^0-9A-Za-z가-힣_.\\-]", "_");
     }
@@ -40,7 +41,6 @@ public class EntrySongHandler extends ListenerAdapter {
         switch (event.getName()) {
             case "setentrytime" -> {
                 User user = event.getUser();
-                long userId = user.getIdLong();
 
                 int start = event.getOption("start").getAsInt();
                 int duration = event.getOption("duration").getAsInt();
@@ -51,8 +51,12 @@ public class EntrySongHandler extends ListenerAdapter {
                     return;
                 }
 
+                // username#disc 기반 키
+                String username = sanitize(user.getName());
+                String discriminator = sanitize(user.getDiscriminator());
+
                 // 1) 먼저 레지스트리에 설정된 입장곡 있는지 확인
-                var cfg = EntrySongRegistry.getSong(userId);
+                EntrySongConfig cfg = EntrySongRegistry.getSong(username, discriminator);
 
                 String fileNameToUse = null;
 
@@ -62,8 +66,6 @@ public class EntrySongHandler extends ListenerAdapter {
                     System.out.println("[EntrySong] /setentrytime use registry fileName=" + fileNameToUse);
                 } else {
                     // 2) 레지스트리에 없으면, 업로드된 username#disc.mp3 가 있는지 확인해서 그걸 사용
-                    String username = sanitize(user.getName());
-                    String discriminator = sanitize(user.getDiscriminator());
                     String fileName = username + "#" + discriminator + ".mp3";
 
                     Path candidatePath = Path.of("uploads", fileName);
@@ -80,8 +82,8 @@ public class EntrySongHandler extends ListenerAdapter {
                     System.out.println("[EntrySong] /setentrytime use fallback fileName=" + fileNameToUse);
                 }
 
-                // 3) 최종적으로 결정된 fileName에 대해 시간 설정 저장
-                EntrySongRegistry.setSong(userId, fileNameToUse, start, duration);
+                // 3) 최종적으로 결정된 fileName에 대해 시간 설정 저장 (username 기반)
+                EntrySongRegistry.setSong(username, discriminator, fileNameToUse, start, duration);
 
                 event.reply("⏱️ 입장곡 재생 구간을 " +
                                 start + "초 ~ " + (start + duration) + "초로 설정했습니다.\n" +
@@ -117,10 +119,13 @@ public class EntrySongHandler extends ListenerAdapter {
         }
 
         User user = event.getMember().getUser();
-        long userId = user.getIdLong();
+
+        // username#disc 기반 키
+        String username = sanitize(user.getName());
+        String discriminator = sanitize(user.getDiscriminator());
 
         // 1) 우선 EntrySongRegistry 에 등록된 입장곡 있는지 확인
-        var cfg = EntrySongRegistry.getSong(userId);
+        EntrySongConfig cfg = EntrySongRegistry.getSong(username, discriminator);
         String path = null;
         int startSec = 0;
         int durationSec = DEFAULT_ENTRY_DURATION_SEC;
@@ -141,15 +146,13 @@ public class EntrySongHandler extends ListenerAdapter {
                 path = null;
             }
         } else {
-            System.out.println("[EntrySong] no registry config for userId=" + userId +
-                    " → fallback to username#disc.mp3");
+            System.out.println("[EntrySong] no registry config for tag=" +
+                    username + "#" + discriminator + " → fallback to username#disc.mp3");
         }
 
         // 2) 레지스트리 기반이 없거나, 파일이 없으면 fallback:
         //    uploads/{username}#{discriminator}.mp3 를 입장곡으로 사용
         if (path == null) {
-            String username = sanitize(user.getName());
-            String discriminator = sanitize(user.getDiscriminator());
             String fileName = username + "#" + discriminator + ".mp3";
 
             Path candidatePath = Path.of("uploads", fileName);
@@ -177,7 +180,7 @@ public class EntrySongHandler extends ListenerAdapter {
 
         System.out.println("[EntrySong] audioManager connected? " + audioManager.isConnected());
 
-        // ★ 2번: sendingHandler 강제 세팅
+        // ★ sendingHandler 강제 세팅
         if (audioManager.getSendingHandler() == null) {
             System.out.println("[EntrySong] no sendingHandler, setting from ServerMusicManager.");
             audioManager.setSendingHandler(music.getSendHandler());

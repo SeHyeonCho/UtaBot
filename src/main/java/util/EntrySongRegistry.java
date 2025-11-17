@@ -1,37 +1,109 @@
 package util;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.IOException;
+import java.lang.reflect.Type;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 특정 유저의 입장곡 URL을 저장하는 임시 레지스트리.
- *
+ * username#discriminator 기반으로 입장곡 설정 저장
  */
-public class EntrySongRegistry {
+public final class EntrySongRegistry {
 
-    public static class EntrySongConfig {
-        public final String fileName;   // "세현#2221.mp3"
-        public final int startSec;      // 시작 위치 (초)
-        public final int durationSec;   // 재생 길이 (초)
+    private static final Path STORE_PATH = Paths.get("data", "entry-songs.json");
+    private static final Gson GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .create();
+    private static final Type MAP_TYPE =
+            new TypeToken<Map<String, EntrySongConfig>>(){}.getType();
 
-        public EntrySongConfig(String fileName, int startSec, int durationSec) {
-            this.fileName = fileName;
-            this.startSec = startSec;
-            this.durationSec = durationSec;
+    // key = "username#0000"
+    private static final Map<String, EntrySongConfig> REGISTRY =
+            new ConcurrentHashMap<>();
+
+    static {
+        loadFromDisk();
+    }
+
+    private EntrySongRegistry() {}
+
+    // username#0000 생성 함수
+    private static String keyOf(String username, String discriminator) {
+        return username + "#" + discriminator;
+    }
+
+    public static EntrySongConfig getSong(String username, String discriminator) {
+        return REGISTRY.get(keyOf(username, discriminator));
+    }
+
+    public static EntrySongConfig getSong(String tag) { // "name#0000"
+        return REGISTRY.get(tag);
+    }
+
+    public static synchronized void setSong(String username, String discriminator,
+                                            String fileName, int start, int duration) {
+
+        String key = keyOf(username, discriminator);
+        EntrySongConfig cfg = new EntrySongConfig(fileName, start, duration);
+
+        REGISTRY.put(key, cfg);
+        saveToDisk();
+    }
+
+    public static synchronized void removeSong(String username, String discriminator) {
+        REGISTRY.remove(keyOf(username, discriminator));
+        saveToDisk();
+    }
+
+    private static void loadFromDisk() {
+        try {
+            if (!Files.exists(STORE_PATH)) {
+                System.out.println("[EntrySongRegistry] no store file, start empty.");
+                return;
+            }
+
+            try (BufferedReader reader = Files.newBufferedReader(STORE_PATH, StandardCharsets.UTF_8)) {
+                Map<String, EntrySongConfig> loaded = GSON.fromJson(reader, MAP_TYPE);
+                if (loaded != null) {
+                    REGISTRY.clear();
+                    REGISTRY.putAll(loaded);
+                    System.out.println("[EntrySongRegistry] loaded " + REGISTRY.size() + " entries.");
+                }
+            }
+        } catch (IOException e) {
+            System.out.println("[EntrySongRegistry] load failed:");
+            e.printStackTrace();
         }
     }
 
-    private static final Map<Long, EntrySongConfig> songs = new ConcurrentHashMap<>();
+    private static void saveToDisk() {
+        try {
+            Path dir = STORE_PATH.getParent();
+            if (dir != null && !Files.exists(dir)) {
+                Files.createDirectories(dir);
+            }
 
-    public static void setSong(long userId, String fileName, int start, int duration) {
-        songs.put(userId, new EntrySongConfig(fileName, start, duration));
-    }
+            try (BufferedWriter writer = Files.newBufferedWriter(
+                    STORE_PATH,
+                    StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE,
+                    StandardOpenOption.TRUNCATE_EXISTING
+            )) {
+                GSON.toJson(REGISTRY, MAP_TYPE, writer);
+            }
 
-    public static EntrySongConfig getSong(long userId) {
-        return songs.get(userId);
-    }
-
-    public static void removeSong(long userId) {
-        songs.remove(userId);
+            System.out.println("[EntrySongRegistry] saved.");
+        } catch (IOException e) {
+            System.out.println("[EntrySongRegistry] save failed:");
+            e.printStackTrace();
+        }
     }
 }
