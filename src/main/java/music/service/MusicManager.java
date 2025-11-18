@@ -1,4 +1,4 @@
-package handler.music;
+package music.service;
 
 import com.sedmelluq.discord.lavaplayer.player.*;
 import com.sedmelluq.discord.lavaplayer.source.*;
@@ -51,3 +51,5 @@ public class MusicManager {
         return playerManager;
     }
 }
+
+

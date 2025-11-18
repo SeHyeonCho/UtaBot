@@ -1,4 +1,4 @@
-package util;
+package entrysong.repository;
 
 public class EntrySongConfig {
     public final String fileName;   // "세현#2221.mp3"
@@ -20,3 +20,5 @@ public class EntrySongConfig {
                 '}';
     }
 }
+
+

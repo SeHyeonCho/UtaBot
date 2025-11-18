@@ -1,11 +1,11 @@
-package handler;
+package common.handler;
 
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.managers.AudioManager;
-import util.Util;
+import common.util.CommandUtils;
 
 public class VoiceCommandHandler extends ListenerAdapter {
 
@@ -19,7 +19,7 @@ public class VoiceCommandHandler extends ListenerAdapter {
     }
 
     private void handleJoin(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
 
@@ -39,7 +39,7 @@ public class VoiceCommandHandler extends ListenerAdapter {
     }
 
     private void handleLeave(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
 
@@ -52,3 +52,5 @@ public class VoiceCommandHandler extends ListenerAdapter {
         }
     }
 }
+
+

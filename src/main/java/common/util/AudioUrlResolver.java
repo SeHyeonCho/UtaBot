@@ -1,10 +1,13 @@
-package util;
+package common.util;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.*;
 
-public class YtdlpResolver {
+/**
+ * yt-dlp를 사용하여 URL 또는 검색어를 오디오 스트림 URL로 변환하는 클래스
+ */
+public class AudioUrlResolver {
     public static CompletableFuture<String> resolveAudioUrl(String input) {
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -39,3 +42,5 @@ public class YtdlpResolver {
         return s.startsWith("http://") || s.startsWith("https://");
     }
 }
+
+

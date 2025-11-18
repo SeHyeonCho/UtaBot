@@ -1,4 +1,4 @@
-package handler.music;
+package music.handler;
 
 
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
@@ -13,7 +13,10 @@ import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.managers.AudioManager;
-import util.Util;
+import music.service.MusicManager;
+import music.service.ServerMusicManager;
+import common.util.AudioUrlResolver;
+import common.util.CommandUtils;
 
 public class MusicCommandHandler extends ListenerAdapter {
 
@@ -30,33 +33,46 @@ public class MusicCommandHandler extends ListenerAdapter {
     }
 
     private void handlePlay(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
 
-        Member m = event.getMember();
-        if (m == null || m.getVoiceState() == null || !m.getVoiceState().inAudioChannel()) {
-            event.reply("먼저 보이스 채널에 들어가 주세요!").setEphemeral(true).queue();
+        Member member = event.getMember();
+        if (!isMemberInVoiceChannel(member, event)) {
             return;
         }
 
-        AudioChannel ch = m.getVoiceState().getChannel();
+        AudioChannel channel = member.getVoiceState().getChannel();
         Guild guild = event.getGuild();
         ServerMusicManager music = MusicManager.get().of(guild);
 
+        ensureAudioConnection(guild, music, channel);
+
+        String query = event.getOption("query").getAsString();
+        event.deferReply().queue();
+
+        loadAndPlayTrack(music, query, event);
+    }
+
+    private boolean isMemberInVoiceChannel(Member member, SlashCommandInteractionEvent event) {
+        if (member == null || member.getVoiceState() == null || !member.getVoiceState().inAudioChannel()) {
+            event.reply("먼저 보이스 채널에 들어가 주세요!").setEphemeral(true).queue();
+            return false;
+        }
+        return true;
+    }
+
+    private void ensureAudioConnection(Guild guild, ServerMusicManager music, AudioChannel channel) {
         AudioManager audioManager = guild.getAudioManager();
         if (!audioManager.isConnected()) {
             audioManager.setSelfDeafened(true);
             audioManager.setSendingHandler(music.sendHandler);
-            audioManager.openAudioConnection(ch);
+            audioManager.openAudioConnection(channel);
         }
+    }
 
-        String q = event.getOption("query").getAsString();
-        event.deferReply().queue();
-
-
-
-        util.YtdlpResolver.resolveAudioUrl(q).whenComplete((streamUrl, err) -> {
+    private void loadAndPlayTrack(ServerMusicManager music, String query, SlashCommandInteractionEvent event) {
+        AudioUrlResolver.resolveAudioUrl(query).whenComplete((streamUrl, err) -> {
             if (err != null) {
                 err.printStackTrace();
                 event.getHook().sendMessage("yt-dlp 로드 실패: " + err.getMessage()).queue();
@@ -66,45 +82,55 @@ public class MusicCommandHandler extends ListenerAdapter {
             MusicManager.get().playerManager().loadItemOrdered(
                     music,
                     streamUrl,
-                    new AudioLoadResultHandler() {
-
-                        @Override
-                        public void trackLoaded(AudioTrack track) {
-                            music.scheduler.queue(track);
-                            event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
-                        }
-
-                        @Override
-                        public void playlistLoaded(AudioPlaylist playlist) {
-                            AudioTrack first = playlist.getSelectedTrack();
-                            if (first == null && !playlist.getTracks().isEmpty()) {
-                                first = playlist.getTracks().get(0);
-                            }
-                            if (first != null) {
-                                music.scheduler.queue(first);
-                                event.getHook().sendMessage("▶️ 재생/추가: **" + first.getInfo().title + "** (플레이리스트)").queue();
-                            } else {
-                                event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
-                            }
-                        }
-
-                        @Override
-                        public void noMatches() {
-                            event.getHook().sendMessage("스트림 URL을 찾지 못했어요.").queue();
-                        }
-
-                        @Override
-                        public void loadFailed(FriendlyException e) {
-                            e.printStackTrace();
-                            event.getHook().sendMessage("로드 실패: " + e.getMessage()).queue();
-                        }
-                    }
+                    createAudioLoadResultHandler(music, event)
             );
         });
     }
 
+    private AudioLoadResultHandler createAudioLoadResultHandler(ServerMusicManager music, 
+                                                               SlashCommandInteractionEvent event) {
+        return new AudioLoadResultHandler() {
+            @Override
+            public void trackLoaded(AudioTrack track) {
+                music.scheduler.queue(track);
+                event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
+            }
+
+            @Override
+            public void playlistLoaded(AudioPlaylist playlist) {
+                handlePlaylistLoaded(playlist, music, event);
+            }
+
+            @Override
+            public void noMatches() {
+                event.getHook().sendMessage("스트림 URL을 찾지 못했어요.").queue();
+            }
+
+            @Override
+            public void loadFailed(FriendlyException e) {
+                e.printStackTrace();
+                event.getHook().sendMessage("로드 실패: " + e.getMessage()).queue();
+            }
+        };
+    }
+
+    private void handlePlaylistLoaded(AudioPlaylist playlist, ServerMusicManager music, 
+                                     SlashCommandInteractionEvent event) {
+        AudioTrack first = playlist.getSelectedTrack();
+        if (first == null && !playlist.getTracks().isEmpty()) {
+            first = playlist.getTracks().get(0);
+        }
+        
+        if (first != null) {
+            music.scheduler.queue(first);
+            event.getHook().sendMessage("▶️ 재생/추가: **" + first.getInfo().title + "** (플레이리스트)").queue();
+        } else {
+            event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
+        }
+    }
+
     private void handleSkip(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
 
@@ -114,7 +140,7 @@ public class MusicCommandHandler extends ListenerAdapter {
     }
 
     private void handleStop(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
 
@@ -128,7 +154,7 @@ public class MusicCommandHandler extends ListenerAdapter {
     }
 
     private void handleQueue(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) return;
+        if (!CommandUtils.requireGuild(event)) return;
         Queue<AudioTrack> queue = MusicManager.get().of(event.getGuild()).scheduler.getQueue();
         if (queue.isEmpty()) {
             event.reply("대기열이 비었어요.").setEphemeral(true).queue();
@@ -145,7 +171,7 @@ public class MusicCommandHandler extends ListenerAdapter {
     }
 
     private void handleVolume(SlashCommandInteractionEvent event) {
-        if (!Util.requireGuild(event)) {
+        if (!CommandUtils.requireGuild(event)) {
             return;
         }
         ServerMusicManager music = MusicManager.get().of(event.getGuild());
@@ -168,3 +194,5 @@ public class MusicCommandHandler extends ListenerAdapter {
         event.reply("✅ 볼륨을 **" + vol + "%** 로 설정했습니다.").queue();
     }
 }
+
+

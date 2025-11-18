@@ -1,4 +1,4 @@
-package util;
+package entrysong.repository;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -107,3 +107,5 @@ public final class EntrySongRegistry {
         }
     }
 }
+
+

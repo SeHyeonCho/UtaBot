@@ -1,4 +1,4 @@
-package util;
+package upload.repository;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,17 +9,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class UploadChannelRegistry {
 
-    private static final Map<Long, Long> uploadChannelByGuild = new ConcurrentHashMap<>();
+    private static final Map<Long, Long> UPLOAD_CHANNEL_BY_GUILD = new ConcurrentHashMap<>();
 
     public static void setUploadChannel(long guildId, long channelId) {
-        uploadChannelByGuild.put(guildId, channelId);
+        UPLOAD_CHANNEL_BY_GUILD.put(guildId, channelId);
     }
 
     public static Long getUploadChannel(long guildId) {
-        return uploadChannelByGuild.get(guildId);
+        return UPLOAD_CHANNEL_BY_GUILD.get(guildId);
     }
 
     public static void removeUploadChannel(long guildId) {
-        uploadChannelByGuild.remove(guildId);
+        UPLOAD_CHANNEL_BY_GUILD.remove(guildId);
     }
 }
+
+

@@ -1,4 +1,4 @@
-package handler;
+package common.handler;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
@@ -23,3 +23,5 @@ public class DefaultCommandHandler extends ListenerAdapter {
         }
     }
 }
+
+

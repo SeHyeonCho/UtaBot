@@ -1,4 +1,4 @@
-package handler.music;
+package music.handler;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
@@ -56,4 +56,5 @@ public class AudioPlayerHandler implements AudioSendHandler {
         return true;
     }
 }
+
 

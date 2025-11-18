@@ -1,11 +1,11 @@
-package handler;
+package upload.handler;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.entities.User;
-import util.EntrySongRegistry;
-import util.UploadChannelRegistry;
+import entrysong.repository.EntrySongRegistry;
+import upload.repository.UploadChannelRegistry;
 
 import java.nio.file.Files;
 import java.nio.file.Path;

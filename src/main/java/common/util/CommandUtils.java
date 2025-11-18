@@ -1,10 +1,10 @@
-package util;
+package common.util;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 
-public class Util {
+public class CommandUtils {
 
-    private Util() {
+    private CommandUtils() {
     }
 
     public static boolean requireGuild(SlashCommandInteractionEvent event) {
@@ -17,3 +17,5 @@ public class Util {
         return true;
     }
 }
+
+

@@ -1,7 +1,8 @@
-package handler.music;
+package music.service;
 
 import com.sedmelluq.discord.lavaplayer.player.*;
 import net.dv8tion.jda.api.audio.AudioSendHandler;
+import music.handler.AudioPlayerHandler;
 
 /**
  * 서버의 음악 재생에 필요한 구성 요소를 모아놓은 클래스입니다.
@@ -24,3 +25,5 @@ public class ServerMusicManager {
         return sendHandler;
     }
 }
+
+

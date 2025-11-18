@@ -1,8 +1,9 @@
-import handler.DefaultCommandHandler;
-import handler.EntrySongHandler;
-import handler.UploadHandler;
-import handler.VoiceCommandHandler;
-import handler.music.MusicCommandHandler;
+import common.command.CommandRegister;
+import common.handler.DefaultCommandHandler;
+import common.handler.VoiceCommandHandler;
+import entrysong.handler.EntrySongHandler;
+import music.handler.MusicCommandHandler;
+import upload.handler.UploadHandler;
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
