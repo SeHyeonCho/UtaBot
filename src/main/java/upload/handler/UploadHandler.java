@@ -1,9 +1,15 @@
 package upload.handler;
 
+import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
+
+import java.util.List;
 import entrysong.repository.EntrySongRegistry;
 import upload.repository.UploadChannelRegistry;
 
@@ -27,10 +33,10 @@ public class UploadHandler extends ListenerAdapter {
                     return;
                 }
 
-                var option = event.getOption("channel");
-                var channel = option.getAsChannel();
+                OptionMapping option = event.getOption("channel");
+                GuildChannel channel = option.getAsChannel();
 
-                if (!(channel instanceof net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel messageChannel)) {
+                if (!(channel instanceof GuildMessageChannel messageChannel)) {
                     event.reply("❌ 텍스트 채널만 업로드 채널로 설정할 수 있어요!")
                             .setEphemeral(true).queue();
                     return;
@@ -57,7 +63,7 @@ public class UploadHandler extends ListenerAdapter {
         if (uploadChannelId == null) return;
         if (event.getChannel().getIdLong() != uploadChannelId) return;
 
-        var attachments = event.getMessage().getAttachments();
+        List<Message.Attachment> attachments = event.getMessage().getAttachments();
         if (attachments.isEmpty()) return;
 
         attachments.stream()
@@ -66,7 +72,7 @@ public class UploadHandler extends ListenerAdapter {
     }
 
     private void saveMp3File(MessageReceivedEvent event,
-                             net.dv8tion.jda.api.entities.Message.Attachment file) {
+                             Message.Attachment file) {
         try {
             Path baseDir = Path.of("uploads");
             Files.createDirectories(baseDir);

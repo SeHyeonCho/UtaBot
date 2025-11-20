@@ -9,8 +9,11 @@ import java.nio.file.Path;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.User;
+import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.managers.AudioManager;
 import entrysong.repository.EntrySongConfig;
 import entrysong.repository.EntrySongRegistry;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
@@ -140,7 +143,7 @@ public class EntrySongHandler extends ListenerAdapter {
             return;
         }
 
-        var guild = event.getGuild();
+        Guild guild = event.getGuild();
         ServerMusicManager music = MusicManager.get().of(guild);
         prepareAudioConnection(guild, music, event.getChannelJoined());
 
@@ -230,10 +233,10 @@ public class EntrySongHandler extends ListenerAdapter {
         return new EntrySongSource(candidatePath.toString(), false, 0, DEFAULT_ENTRY_DURATION_SEC);
     }
 
-    private void prepareAudioConnection(net.dv8tion.jda.api.entities.Guild guild, 
+    private void prepareAudioConnection(Guild guild, 
                                        ServerMusicManager music,
-                                       net.dv8tion.jda.api.entities.channel.middleman.AudioChannel joinedChannel) {
-        var audioManager = guild.getAudioManager();
+                                       AudioChannel joinedChannel) {
+        AudioManager audioManager = guild.getAudioManager();
         System.out.println("[EntrySong] audioManager connected? " + audioManager.isConnected());
 
         if (audioManager.getSendingHandler() == null) {

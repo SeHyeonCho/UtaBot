@@ -12,6 +12,7 @@ import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
+import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.managers.AudioManager;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
@@ -148,7 +149,7 @@ public class MusicCommandHandler extends ListenerAdapter {
         ServerMusicManager music = MusicManager.get().of(guild);
         music.player.stopTrack();
         music.scheduler.getQueue().clear();
-        var audioManager = guild.getAudioManager();
+        AudioManager audioManager = guild.getAudioManager();
         if (audioManager.isConnected()) audioManager.closeAudioConnection();
         event.reply("⏹ 정지하고 연결을 종료했어요.").queue();
     }
@@ -177,7 +178,7 @@ public class MusicCommandHandler extends ListenerAdapter {
         ServerMusicManager music = MusicManager.get().of(event.getGuild());
         AudioPlayer player = music.player;
 
-        var opt = event.getOption("level");
+        OptionMapping opt = event.getOption("level");
 
         if (opt == null) {
             event.reply("🔊 현재 볼륨: **" + player.getVolume() + "%**").queue();
