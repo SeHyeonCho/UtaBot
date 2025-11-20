@@ -29,7 +29,7 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ### 1. 업로드 채널 기반 mp3 입장곡
 - `/setuploadchannel <채널>`  
-  - 길드(서버)별로 **mp3 업로드 전용 텍스트 채널**을 설정
+  - 서버별로 **mp3 업로드 전용 텍스트 채널**을 설정
 - 설정된 업로드 채널에 `.mp3` 파일을 올리면:
   - 서버 로컬 `uploads/` 폴더에  
     `username#discriminator.mp3` 형식으로 자동 저장  
@@ -77,8 +77,8 @@ Slash Command 기반으로 명령어를 수행합니다.
   - `/setentrysong`, `/setentrytime`, mp3 업로드 시마다 자동으로 저장
   - 서버를 껐다 켜도 **입장곡 설정 유지**
 
-- 업로드 채널 정보는 `UploadChannelRegistry`(`upload.repository.UploadChannelRegistry`)에서 길드별로 관리
-  - 길드 ID → 업로드 채널 ID 매핑
+- 업로드 채널 정보는 `UploadChannelRegistry`(`upload.repository.UploadChannelRegistry`)에서 서버별로 관리
+  - 서버 ID → 업로드 채널 ID 매핑
   - 메모리 내에서 관리 (재시작 시 초기화)
 
 ---

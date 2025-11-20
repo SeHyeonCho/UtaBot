@@ -17,7 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * 길드별로 설정된 업로드 채널에서 .mp3 파일이 올라오면
+ * 서버별로 설정된 업로드 채널에서 .mp3 파일이 올라오면
  * 서버 로컬에 저장하고 해당 유저의 입장곡으로 등록하는 핸들러.
  * (username#0000 기반 저장)
  */
