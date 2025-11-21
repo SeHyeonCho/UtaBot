@@ -10,7 +10,7 @@ Slash Command 기반으로 명령어를 수행합니다.
 ## 음악 재생 기능
 - `/play <검색어 | URL>`  
   - 유튜브 URL 또는 검색어로 음악을 로드
-  - `AudioUrlResolver`를 통해 `yt-dlp`로 실제 오디오 스트림 URL을 resolve 한 뒤 재생
+  - Lavaplayer의 `youtube-source`를 통해 YouTube URL을 처리하여 재생
   - 자동으로 사용자의 음성 채널에 접속하여 재생
 - `/skip` — 현재 트랙 건너뛰기
 - `/stop` — 재생 중지 + 대기열 초기화
@@ -40,7 +40,7 @@ Slash Command 기반으로 명령어를 수행합니다.
 ### 2. 유튜브 URL 기반 입장곡
 - `/setentrysong <url>`  
   - 유튜브(또는 기타 지원 URL)를 **입장곡으로 설정**
-  - 내부적으로 `AudioUrlResolver`를 통해 `yt-dlp`로 실제 오디오 스트림 URL을 resolve 한 뒤 재생
+  - 내부적으로 Lavaplayer의 `youtube-source`를 통해 YouTube URL을 처리하여 재생
   - `music.youtube.com`, `youtu.be` 등도 정규화하여 처리 가능
 
 ### 3. 입장곡 재생 구간 설정
@@ -54,7 +54,7 @@ Slash Command 기반으로 명령어를 수행합니다.
 - 유저가 음성 채널에 **입장**하면:
   1. 해당 유저의 `username#discriminator` 키로 EntrySongRegistry 조회
   2. 우선 **레지스트리에 등록된 입장곡** 사용  
-     - URL이면 → `AudioUrlResolver`를 통해 `yt-dlp`로 스트림 URL resolve 후 재생  
+     - URL이면 → Lavaplayer의 `youtube-source`를 통해 재생  
      - 파일명이면 → `uploads/파일명` 에서 mp3 재생
   3. 레지스트리에 없으면  
      `uploads/{username}#{discriminator}.mp3` 가 존재할 경우 이를 fallback 입장곡으로 사용
@@ -95,7 +95,6 @@ src/main/java/
 │   │   ├── DefaultCommandHandler.java # 기본 명령어 (ping, echo)
 │   │   └── VoiceCommandHandler.java  # 보이스 채널 명령어 (join, leave)
 │   └── util/
-│       ├── AudioUrlResolver.java      # yt-dlp를 통한 오디오 URL 해석
 │       └── CommandUtils.java         # 명령어 유틸리티
 ├── music/                             # 음악 재생 기능
 │   ├── handler/

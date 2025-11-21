@@ -16,7 +16,6 @@ import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.managers.AudioManager;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
-import common.util.AudioUrlResolver;
 import common.util.CommandUtils;
 
 public class MusicCommandHandler extends ListenerAdapter {
@@ -73,23 +72,18 @@ public class MusicCommandHandler extends ListenerAdapter {
     }
 
     private void loadAndPlayTrack(ServerMusicManager music, String query, SlashCommandInteractionEvent event) {
-        AudioUrlResolver.resolveAudioUrl(query).whenComplete((streamUrl, err) -> {
-            if (err != null) {
-                err.printStackTrace();
-                event.getHook().sendMessage("yt-dlp 로드 실패: " + err.getMessage()).queue();
-                return;
-            }
-
-            MusicManager.get().playerManager().loadItemOrdered(
-                    music,
-                    streamUrl,
-                    createAudioLoadResultHandler(music, event)
-            );
-        });
+        // 모든 URL/검색어를 Lavaplayer에 직접 전달 (youtube-source가 처리)
+        MusicManager.get().playerManager().loadItemOrdered(
+                music,
+                query,
+                createAudioLoadResultHandler(music, event, null)
+        );
     }
 
+
     private AudioLoadResultHandler createAudioLoadResultHandler(ServerMusicManager music, 
-                                                               SlashCommandInteractionEvent event) {
+                                                               SlashCommandInteractionEvent event,
+                                                               String customTitle) {
         return new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
@@ -117,17 +111,20 @@ public class MusicCommandHandler extends ListenerAdapter {
 
     private void handlePlaylistLoaded(AudioPlaylist playlist, ServerMusicManager music, 
                                      SlashCommandInteractionEvent event) {
-        AudioTrack first = playlist.getSelectedTrack();
-        if (first == null && !playlist.getTracks().isEmpty()) {
-            first = playlist.getTracks().get(0);
-        }
-        
-        if (first != null) {
-            music.scheduler.queue(first);
-            event.getHook().sendMessage("▶️ 재생/추가: **" + first.getInfo().title + "** (플레이리스트)").queue();
-        } else {
+        if (playlist.getTracks().isEmpty()) {
             event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
+            return;
         }
+
+        // 모든 트랙을 큐에 추가
+        int addedCount = 0;
+        for (AudioTrack track : playlist.getTracks()) {
+            music.scheduler.queue(track);
+            addedCount++;
+        }
+
+        String playlistName = playlist.getName() != null ? playlist.getName() : "재생목록";
+        event.getHook().sendMessage("▶️ 재생목록 추가: **" + playlistName + "** (" + addedCount + "곡)").queue();
     }
 
     private void handleSkip(SlashCommandInteractionEvent event) {

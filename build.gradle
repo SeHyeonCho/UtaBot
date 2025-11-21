@@ -7,10 +7,12 @@ version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
+    maven { url 'https://jitpack.io' }
 }
 
 dependencies {
     implementation("dev.arbjerg:lavaplayer:2.2.4")
+    implementation("com.github.lavalink-devs:youtube-source:1.16.0")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
     implementation("net.dv8tion:JDA:6.1.1")
 

@@ -20,7 +20,6 @@ import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.track.*;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import common.util.AudioUrlResolver;
 
 /**
  * 특정 유저가 보이스 채널에 입장했을 때
@@ -276,25 +275,15 @@ public class EntrySongHandler extends ListenerAdapter {
     private void loadEntrySongFromUrl(ServerMusicManager music,
                                      AtomicReference<AudioTrack> originalCloneRef,
                                      EntrySongSource sourceInfo) {
-        System.out.println("[EntrySong] resolving URL via yt-dlp: " + sourceInfo.source);
+        System.out.println("[EntrySong] loading URL via Lavaplayer: " + sourceInfo.source +
+                " (start=" + sourceInfo.startSec + ", duration=" + sourceInfo.durationSec + ")");
 
-        AudioUrlResolver.resolveAudioUrl(sourceInfo.source).whenComplete((streamUrl, err) -> {
-            if (err != null || streamUrl == null) {
-                System.out.println("[EntrySong] yt-dlp resolve failed for " + sourceInfo.source);
-                if (err != null) err.printStackTrace();
-                return;
-            }
-
-            System.out.println("[EntrySong] yt-dlp resolved URL: " + streamUrl +
-                    " (start=" + sourceInfo.startSec + ", duration=" + sourceInfo.durationSec + ")");
-
-            MusicManager.get().playerManager().loadItemOrdered(
-                    music,
-                    streamUrl,
-                    createEntrySongHandler(music, originalCloneRef, streamUrl, 
-                            sourceInfo.startSec, sourceInfo.durationSec)
-            );
-        });
+        MusicManager.get().playerManager().loadItemOrdered(
+                music,
+                sourceInfo.source,
+                createEntrySongHandler(music, originalCloneRef, sourceInfo.source, 
+                        sourceInfo.startSec, sourceInfo.durationSec)
+        );
     }
 
     private void loadEntrySongFromFile(ServerMusicManager music,
