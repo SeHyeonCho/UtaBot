@@ -1,14 +1,25 @@
-import common.command.CommandRegister;
-import common.handler.DefaultCommandHandler;
-import entrysong.handler.EntrySongHandler;
+import common.command.CommandDispatcher;
+import common.command.basic.EchoCommand;
+import common.command.basic.PingCommand;
+import entrysong.command.SetEntrySongCommand;
+import entrysong.command.SetEntryTimeCommand;
+import entrysong.command.SetUploadChannelCommand;
+import entrysong.handler.EntrySongJoinHandler;
 import entrysong.handler.EntrySongUploadHandler;
 import entrysong.repository.EntrySongRepository;
 import entrysong.repository.UploadChannelRepository;
 import entrysong.service.EntrySongService;
 import entrysong.service.LegacyEntrySongMigration;
 import entrysong.service.LegacyEntrySongMigration.GuildMember;
-import music.handler.MusicCommandHandler;
-import music.handler.VoiceCommandHandler;
+import music.audio.AudioPlayerManagerFactory;
+import music.command.JoinCommand;
+import music.command.LeaveCommand;
+import music.command.PlayCommand;
+import music.command.QueueCommand;
+import music.command.SkipCommand;
+import music.command.StopCommand;
+import music.command.VolumeCommand;
+import music.service.MusicManager;
 import io.github.cdimascio.dotenv.Dotenv;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -21,6 +32,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 봇 진입점입니다.
+ *
+ * 봇에서 쓰는 객체는 모두 여기서 만들고 필요한 곳에 생성자로 넘겨줍니다.
+ */
 public class Main {
 
     private static final Path ENTRY_SONG_STORE = Path.of("data", "server-entry-songs.json");
@@ -31,9 +47,29 @@ public class Main {
         Dotenv dotenv = Dotenv.load();
         String token = dotenv.get("TOKEN");
 
+        MusicManager musicManager = new MusicManager(AudioPlayerManagerFactory.create());
         EntrySongRepository entrySongRepository = new EntrySongRepository(ENTRY_SONG_STORE);
         EntrySongService entrySongService = new EntrySongService(entrySongRepository, UPLOAD_DIR);
         UploadChannelRepository uploadChannelRepository = new UploadChannelRepository();
+
+        CommandDispatcher commandDispatcher = new CommandDispatcher(List.of(
+                // 기본
+                new PingCommand(),
+                new EchoCommand(),
+                // 보이스 채널
+                new JoinCommand(musicManager),
+                new LeaveCommand(musicManager),
+                // 음악
+                new PlayCommand(musicManager),
+                new SkipCommand(musicManager),
+                new StopCommand(musicManager),
+                new QueueCommand(musicManager),
+                new VolumeCommand(musicManager),
+                // 입장곡
+                new SetEntryTimeCommand(entrySongService),
+                new SetUploadChannelCommand(uploadChannelRepository),
+                new SetEntrySongCommand(entrySongService)
+        ));
 
         JDA jda = JDABuilder.create(
                         token,
@@ -43,18 +79,15 @@ public class Main {
                         GatewayIntent.GUILD_VOICE_STATES
                 )
                 .addEventListeners(
-                        new DefaultCommandHandler(),
-                        new VoiceCommandHandler(),
-                        new MusicCommandHandler(),
-                        new EntrySongHandler(entrySongService),
+                        commandDispatcher,
+                        new EntrySongJoinHandler(entrySongService, musicManager),
                         new EntrySongUploadHandler(uploadChannelRepository, entrySongService)
                 )
                 .build();
 
-        jda.updateCommands().addCommands().queue();
-        CommandRegister.registerCommand(jda);
-
         jda.awaitReady();
+        System.out.println("로그인 성공 ~!" + jda.getSelfUser().getAsTag());
+
         migrateLegacyEntrySongs(jda, entrySongService, entrySongRepository);
     }
 

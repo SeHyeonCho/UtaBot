@@ -25,5 +25,18 @@ dependencies {
 }
 
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags 'integration'
+    }
+}
+
+// 실제 Discord 토큰(.env)이나 YouTube 접속이 필요한 테스트: ./gradlew integrationTest
+tasks.register('integrationTest', Test) {
+    description = 'Discord 토큰이나 네트워크가 필요한 통합 테스트를 실행합니다.'
+    group = 'verification'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform {
+        includeTags 'integration'
+    }
 }

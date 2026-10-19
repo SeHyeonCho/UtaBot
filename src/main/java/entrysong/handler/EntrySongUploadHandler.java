@@ -1,16 +1,11 @@
 package entrysong.handler;
 
-import common.util.CommandUtils;
 import entrysong.model.EntrySongConfig;
 import entrysong.repository.UploadChannelRepository;
 import entrysong.service.EntrySongService;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
-import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
-import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -28,35 +23,6 @@ public class EntrySongUploadHandler extends ListenerAdapter {
                                   EntrySongService entrySongService) {
         this.uploadChannelRepository = uploadChannelRepository;
         this.entrySongService = entrySongService;
-    }
-
-    @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        switch (event.getName()) {
-            case "setuploadchannel" -> handleSetUploadChannel(event);
-            default -> {}
-        }
-    }
-
-    private void handleSetUploadChannel(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
-        OptionMapping option = event.getOption("channel");
-        GuildChannel channel = option.getAsChannel();
-
-        if (!(channel instanceof GuildMessageChannel messageChannel)) {
-            event.reply("❌ 텍스트 채널만 업로드 채널로 설정할 수 있어요!")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-        long guildId = event.getGuild().getIdLong();
-        uploadChannelRepository.setUploadChannel(guildId, messageChannel.getIdLong());
-
-        event.reply("📥 이 서버의 업로드 채널이 <#" + messageChannel.getIdLong() + "> 로 설정되었습니다!")
-                .queue();
     }
 
     @Override

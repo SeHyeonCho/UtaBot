@@ -1,8 +1,6 @@
 package entrysong.handler;
 
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
-import common.util.CommandUtils;
-import entrysong.model.EntrySongConfig;
 import entrysong.service.EntrySongService;
 import entrysong.service.EntrySongSource;
 import music.service.MusicManager;
@@ -10,97 +8,25 @@ import music.service.ServerMusicManager;
 
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
-import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
 import com.sedmelluq.discord.lavaplayer.track.*;
 import net.dv8tion.jda.api.events.guild.voice.GuildVoiceUpdateEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 /**
- * 입장곡 명령어와 입장 이벤트를 처리하는 핸들러입니다.
- *
  * 특정 유저가 보이스 채널에 입장했을 때
- * 그 서버에 등록된 그 유저의 입장곡(로컬 파일 or URL)을 재생합니다.
+ * 그 서버에 등록된 그 유저의 입장곡(로컬 파일 or URL)을 재생하는 핸들러입니다.
  */
-public class EntrySongHandler extends ListenerAdapter {
+public class EntrySongJoinHandler extends ListenerAdapter {
 
     private final EntrySongService entrySongService;
+    private final MusicManager musicManager;
 
-    public EntrySongHandler(EntrySongService entrySongService) {
+    public EntrySongJoinHandler(EntrySongService entrySongService, MusicManager musicManager) {
         this.entrySongService = entrySongService;
+        this.musicManager = musicManager;
     }
 
-    // ─────────────────────────────
-    // Slash Command
-    //  - /setentrysong  url:링크   → 입장곡 소스를 URL로 설정
-    //  - /setentrytime  start/duration → 현재 입장곡의 재생 구간 수정
-    // ─────────────────────────────
-    @Override
-    public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
-        switch (event.getName()) {
-            case "setentrysong" -> handleSetEntrySong(event);
-            case "setentrytime" -> handleSetEntryTime(event);
-            default -> {}
-        }
-    }
-
-    private void handleSetEntrySong(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
-        String url = event.getOption("url").getAsString();
-
-        if (!EntrySongConfig.isUrl(url)) {
-            event.reply("❌ 유효한 URL을 입력해주세요. (http/https)")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-        EntrySongConfig config = entrySongService.setUrl(
-                event.getGuild().getIdLong(), event.getUser().getIdLong(), url);
-
-        event.reply("🎵 입장곡을 해당 링크로 설정했어요!\n" +
-                        "URL: `" + url + "`\n" +
-                        "구간: " + config.startSec + "초 ~ " + (config.startSec + config.durationSec) + "초\n" +
-                        "원하면 `/setentrytime` 명령어로 다시 구간을 설정할 수 있어요.")
-                .queue();
-    }
-
-    private void handleSetEntryTime(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
-        int start = event.getOption("start").getAsInt();
-        int duration = event.getOption("duration").getAsInt();
-
-        if (start < 0 || duration <= 0) {
-            event.reply("⚠️ start ≥ 0, duration ≥ 1 이어야 합니다.")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-        EntrySongConfig config = entrySongService.setTime(
-                event.getGuild().getIdLong(), event.getUser().getIdLong(), start, duration);
-
-        if (config == null) {
-            event.reply("❌ 이 서버에 설정된 입장곡이 없습니다.\n" +
-                            "먼저 mp3 파일을 업로드하거나 `/setentrysong` 으로 URL을 설정해주세요.")
-                    .setEphemeral(true).queue();
-            return;
-        }
-
-        String sourceText = config.isUrl() ? "`" + config.source + "`" : "업로드한 mp3";
-        event.reply("⏱️ 입장곡 재생 구간을 " +
-                        start + "초 ~ " + (start + duration) + "초로 설정했습니다.\n" +
-                        "(소스: " + sourceText + ")")
-                .queue();
-    }
-
-    // ─────────────────────────────
-    // Voice Update: 유저가 채널에 들어왔을 때
-    // ─────────────────────────────
     @Override
     public void onGuildVoiceUpdate(GuildVoiceUpdateEvent event) {
         if (!shouldProcessVoiceUpdate(event)) {
@@ -114,7 +40,7 @@ public class EntrySongHandler extends ListenerAdapter {
             return;
         }
 
-        ServerMusicManager music = MusicManager.get().of(event.getGuild());
+        ServerMusicManager music = musicManager.of(event.getGuild());
         if (!moveToJoinedChannel(music, event.getChannelJoined())) {
             return;
         }

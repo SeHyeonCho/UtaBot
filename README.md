@@ -98,26 +98,25 @@ src/main/java/
 ├── Main.java                          # 봇 진입점 (객체 생성/연결, 예전 데이터 이전)
 ├── common/                            # 공통 기능
 │   ├── command/
-│   │   └── CommandRegister.java      # 슬래시 명령어 등록
-│   ├── handler/
-│   │   └── DefaultCommandHandler.java # 기본 명령어 (ping, echo)
+│   │   ├── SlashCommand.java          # 명령어 정의 + 처리 인터페이스
+│   │   ├── CommandDispatcher.java     # 서버에 명령어 등록, 이름으로 찾아 실행
+│   │   └── basic/                     # 기본 명령어 (ping, echo)
 │   └── util/
-│       └── CommandUtils.java         # 명령어 유틸리티
+│       └── CommandUtils.java          # 서버/음성 채널 확인 등 명령어 유틸리티
 ├── music/                             # 음악 재생 기능
 │   ├── audio/
 │   │   ├── AudioPlayerManagerFactory.java # LavaPlayer 설정, youtube-source 등록
 │   │   └── AudioPlayerSendHandler.java    # LavaPlayer 오디오를 Discord로 전송
-│   ├── handler/
-│   │   ├── MusicCommandHandler.java   # 음악 명령어 (play, skip, stop, queue, volume)
-│   │   └── VoiceCommandHandler.java   # 보이스 채널 명령어 (join, leave)
+│   ├── command/                       # join, leave, play, skip, stop, queue, volume
 │   └── service/
 │       ├── MusicManager.java          # 서버별 음악 매니저 관리
 │       ├── ServerMusicManager.java    # 서버별 재생 제어 + 음성 연결
 │       └── TrackScheduler.java        # 트랙 대기열, 입장곡 끼워넣기
 └── entrysong/                         # 입장곡 기능
+    ├── command/                       # setentrysong, setentrytime, setuploadchannel
     ├── handler/
-    │   ├── EntrySongHandler.java      # 입장곡 명령어 및 입장 이벤트 처리
-    │   └── EntrySongUploadHandler.java # mp3 업로드 채널 처리
+    │   ├── EntrySongJoinHandler.java  # 음성 채널 입장 시 입장곡 재생
+    │   └── EntrySongUploadHandler.java # 업로드 채널의 mp3 저장
     ├── model/
     │   └── EntrySongConfig.java       # 입장곡 설정 데이터 클래스
     ├── repository/
@@ -128,6 +127,18 @@ src/main/java/
         ├── EntrySongSource.java       # 입장 시 재생할 입장곡 정보
         └── LegacyEntrySongMigration.java # 예전 입장곡 데이터 이전
 ```
+
+### 명령어 추가 방법
+1. `SlashCommand`를 구현하는 클래스를 만들고 `data()`에 이름/설명/옵션을, `execute()`에 처리를 작성
+2. `Main`의 `CommandDispatcher` 목록에 추가 (봇이 켜질 때 모든 서버에 자동 등록)
+
+---
+
+## 테스트
+
+- `./gradlew test` — 단위 테스트. Discord 토큰이나 네트워크 없이 실행됩니다.
+- `./gradlew integrationTest` — 실제 Discord 봇 토큰(`.env`의 `TOKEN`)이나 YouTube 접속이 필요한 테스트.
+  토큰이 없으면 해당 테스트는 건너뜁니다.
 
 ---
 
