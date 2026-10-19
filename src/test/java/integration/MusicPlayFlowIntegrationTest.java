@@ -107,9 +107,8 @@ class MusicPlayFlowIntegrationTest {
         for (Guild guild : guilds) {
             ServerMusicManager serverMusic = musicManager.of(guild);
             assertNotNull(serverMusic);
-            assertNotNull(serverMusic.player);
-            assertNotNull(serverMusic.scheduler);
-            assertNotNull(serverMusic.sendHandler);
+            assertTrue(serverMusic.getQueue().isEmpty());
+            assertFalse(serverMusic.isPlaying());
         }
     }
 

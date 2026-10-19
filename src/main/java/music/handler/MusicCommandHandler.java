@@ -2,23 +2,23 @@ package music.handler;
 
 
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
-import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
-import java.util.Queue;
+import java.util.List;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
-import net.dv8tion.jda.api.managers.AudioManager;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
 import common.util.CommandUtils;
 
 public class MusicCommandHandler extends ListenerAdapter {
+
+    private static final int QUEUE_DISPLAY_LIMIT = 10;
 
     @Override
     public void onSlashCommandInteraction(SlashCommandInteractionEvent event) {
@@ -46,12 +46,15 @@ public class MusicCommandHandler extends ListenerAdapter {
         Guild guild = event.getGuild();
         ServerMusicManager music = MusicManager.get().of(guild);
 
-        ensureAudioConnection(guild, music, channel);
+        if (!music.isConnected()) {
+            music.connect(channel);
+        }
 
         String query = event.getOption("query").getAsString();
         event.deferReply().queue();
 
-        loadAndPlayTrack(music, query, event);
+        // 모든 URL/검색어를 Lavaplayer에 직접 전달 (youtube-source가 처리)
+        music.load(query, createAudioLoadResultHandler(music, event));
     }
 
     private boolean isMemberInVoiceChannel(Member member, SlashCommandInteractionEvent event) {
@@ -62,32 +65,12 @@ public class MusicCommandHandler extends ListenerAdapter {
         return true;
     }
 
-    private void ensureAudioConnection(Guild guild, ServerMusicManager music, AudioChannel channel) {
-        AudioManager audioManager = guild.getAudioManager();
-        if (!audioManager.isConnected()) {
-            audioManager.setSelfDeafened(true);
-            audioManager.setSendingHandler(music.sendHandler);
-            audioManager.openAudioConnection(channel);
-        }
-    }
-
-    private void loadAndPlayTrack(ServerMusicManager music, String query, SlashCommandInteractionEvent event) {
-        // 모든 URL/검색어를 Lavaplayer에 직접 전달 (youtube-source가 처리)
-        MusicManager.get().playerManager().loadItemOrdered(
-                music,
-                query,
-                createAudioLoadResultHandler(music, event, null)
-        );
-    }
-
-
-    private AudioLoadResultHandler createAudioLoadResultHandler(ServerMusicManager music, 
-                                                               SlashCommandInteractionEvent event,
-                                                               String customTitle) {
+    private AudioLoadResultHandler createAudioLoadResultHandler(ServerMusicManager music,
+                                                               SlashCommandInteractionEvent event) {
         return new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
-                music.scheduler.queue(track);
+                music.queue(track);
                 event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
             }
 
@@ -109,7 +92,7 @@ public class MusicCommandHandler extends ListenerAdapter {
         };
     }
 
-    private void handlePlaylistLoaded(AudioPlaylist playlist, ServerMusicManager music, 
+    private void handlePlaylistLoaded(AudioPlaylist playlist, ServerMusicManager music,
                                      SlashCommandInteractionEvent event) {
         if (playlist.getTracks().isEmpty()) {
             event.getHook().sendMessage("플레이리스트를 불러왔지만 트랙이 없어요.").queue();
@@ -119,7 +102,7 @@ public class MusicCommandHandler extends ListenerAdapter {
         // 모든 트랙을 큐에 추가
         int addedCount = 0;
         for (AudioTrack track : playlist.getTracks()) {
-            music.scheduler.queue(track);
+            music.queue(track);
             addedCount++;
         }
 
@@ -132,8 +115,7 @@ public class MusicCommandHandler extends ListenerAdapter {
             return;
         }
 
-        ServerMusicManager music = MusicManager.get().of(event.getGuild());
-        music.scheduler.nextTrack();
+        MusicManager.get().of(event.getGuild()).skip();
         event.reply("⏭ 다음 트랙으로 넘어갑니다.").queue();
     }
 
@@ -142,28 +124,28 @@ public class MusicCommandHandler extends ListenerAdapter {
             return;
         }
 
-        Guild guild = event.getGuild();
-        ServerMusicManager music = MusicManager.get().of(guild);
-        music.player.stopTrack();
-        music.scheduler.getQueue().clear();
-        AudioManager audioManager = guild.getAudioManager();
-        if (audioManager.isConnected()) audioManager.closeAudioConnection();
+        ServerMusicManager music = MusicManager.get().of(event.getGuild());
+        music.stop();
+        if (music.isConnected()) {
+            music.disconnect();
+        }
         event.reply("⏹ 정지하고 연결을 종료했어요.").queue();
     }
 
     private void handleQueue(SlashCommandInteractionEvent event) {
         if (!CommandUtils.requireGuild(event)) return;
-        Queue<AudioTrack> queue = MusicManager.get().of(event.getGuild()).scheduler.getQueue();
+        List<AudioTrack> queue = MusicManager.get().of(event.getGuild()).getQueue();
         if (queue.isEmpty()) {
             event.reply("대기열이 비었어요.").setEphemeral(true).queue();
             return;
         }
         StringBuilder sb = new StringBuilder("**대기열**\n");
-        int i = 1;
-        for (AudioTrack t : queue) {
-            sb.append(i++).append(". ").append(t.getInfo().title).append("\n");
-            if (i > 10) {
-                sb.append("..."); break; } // 너무 길면 생략
+        int shown = Math.min(queue.size(), QUEUE_DISPLAY_LIMIT);
+        for (int i = 0; i < shown; i++) {
+            sb.append(i + 1).append(". ").append(queue.get(i).getInfo().title).append("\n");
+        }
+        if (queue.size() > shown) {
+            sb.append("..."); // 너무 길면 생략
         }
         event.reply(sb.toString()).queue();
     }
@@ -173,12 +155,11 @@ public class MusicCommandHandler extends ListenerAdapter {
             return;
         }
         ServerMusicManager music = MusicManager.get().of(event.getGuild());
-        AudioPlayer player = music.player;
 
         OptionMapping opt = event.getOption("level");
 
         if (opt == null) {
-            event.reply("🔊 현재 볼륨: **" + player.getVolume() + "%**").queue();
+            event.reply("🔊 현재 볼륨: **" + music.getVolume() + "%**").queue();
             return;
         }
 
@@ -188,9 +169,8 @@ public class MusicCommandHandler extends ListenerAdapter {
             return;
         }
 
-        player.setVolume(vol);
+        music.setVolume(vol);
         event.reply("✅ 볼륨을 **" + vol + "%** 로 설정했습니다.").queue();
     }
 }
-
 

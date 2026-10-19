@@ -10,24 +10,36 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.util.Queue;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 /**
  * TrackScheduler 테스트 클래스
- * 
+ *
  * 테스트 대상:
  * - queue(): 트랙을 큐에 추가하거나 바로 재생
- * - nextTrack(): 다음 트랙으로 넘기기
+ * - skip(): 다음 트랙으로 넘기기
+ * - stop(): 대기열 비우고 정지
  * - onTrackEnd(): 트랙 종료 시 자동으로 다음 트랙 재생
- * - getQueue(): 대기열 조회
+ * - playEntrySong(): 입장곡 끼워넣기와 원래 곡 복귀
+ *
+ * executor의 execute()는 바로 실행하고, schedule()로 예약된 작업은 모아뒀다가
+ * 테스트에서 직접 실행해서 시간에 의존하지 않게 합니다.
  */
 @ExtendWith(MockitoExtension.class)
 class TrackSchedulerTest {
+
+    private static final long ENTRY_DURATION_MS = 7_000L;
 
     @Mock
     private AudioPlayer player;
@@ -39,26 +51,59 @@ class TrackSchedulerTest {
     private AudioTrack track2;
 
     @Mock
-    private AudioTrack track3;
+    private AudioTrack entryTrack;
+
+    @Mock
+    private AudioTrack otherEntryTrack;
+
+    @Mock
+    private AudioTrack originalTrack;
+
+    @Mock
+    private AudioTrack originalClone;
+
+    @Mock
+    private ScheduledExecutorService executor;
+
+    @Mock
+    private ScheduledFuture<Object> future;
+
+    private final List<Runnable> scheduledTasks = new ArrayList<>();
 
     private TrackScheduler scheduler;
 
     @BeforeEach
     void setUp() {
-        scheduler = new TrackScheduler(player);
+        lenient().doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(0)).run();
+            return null;
+        }).when(executor).execute(any(Runnable.class));
+        lenient().doAnswer(invocation -> {
+            scheduledTasks.add(invocation.getArgument(0));
+            return future;
+        }).when(executor).schedule(any(Runnable.class), anyLong(), any(TimeUnit.class));
+
+        scheduler = new TrackScheduler(player, executor);
     }
+
+    private void givenOriginalTrackPlayingAt(long positionMs) {
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        when(originalTrack.getPosition()).thenReturn(positionMs);
+        when(originalTrack.makeClone()).thenReturn(originalClone);
+    }
+
+    // ─────────────────────────────
+    // 대기열
+    // ─────────────────────────────
 
     @Test
     @DisplayName("플레이어가 재생 중이 아니면 트랙을 즉시 재생한다")
     void shouldStartTrackImmediatelyWhenPlayerIsNotPlaying() {
-        // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(true);
-
         // when
         scheduler.queue(track1);
 
         // then
-        verify(player, times(1)).startTrack(track1, true);
+        verify(player).startTrack(track1, false);
         assertTrue(scheduler.getQueue().isEmpty());
     }
 
@@ -66,150 +111,268 @@ class TrackSchedulerTest {
     @DisplayName("플레이어가 이미 재생 중이면 큐에 추가한다")
     void shouldAddToQueueWhenPlayerIsAlreadyPlaying() {
         // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
-
-        // when
-        scheduler.queue(track1);
-
-        // then
-        verify(player, times(1)).startTrack(track1, true);
-        assertEquals(1, scheduler.getQueue().size());
-        assertTrue(scheduler.getQueue().contains(track1));
-    }
-
-    @Test
-    @DisplayName("플레이어가 재생 중일 때 여러 트랙을 큐에 추가한다")
-    void shouldQueueMultipleTracksWhenPlayerIsPlaying() {
-        // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
 
         // when
         scheduler.queue(track1);
         scheduler.queue(track2);
-        scheduler.queue(track3);
 
         // then
-        Queue<AudioTrack> queue = scheduler.getQueue();
-        assertEquals(3, queue.size());
-        assertEquals(track1, queue.poll());
-        assertEquals(track2, queue.poll());
-        assertEquals(track3, queue.poll());
+        verify(player, never()).startTrack(any(), anyBoolean());
+        assertEquals(List.of(track1, track2), scheduler.getQueue());
     }
 
     @Test
-    @DisplayName("큐에서 다음 트랙을 재생한다")
-    void shouldPlayNextTrackFromQueue() {
+    @DisplayName("다음 트랙으로 넘기면 큐 맨 앞 트랙을 재생한다")
+    void shouldPlayNextTrackFromQueueOnSkip() {
         // given
-        lenient().when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
         scheduler.queue(track1);
         scheduler.queue(track2);
-        
-        when(player.startTrack(any(AudioTrack.class), eq(false))).thenReturn(true);
 
         // when
-        scheduler.nextTrack();
+        scheduler.skip();
 
         // then
-        verify(player, times(1)).startTrack(track1, false);
-        assertEquals(1, scheduler.getQueue().size());
-        assertTrue(scheduler.getQueue().contains(track2));
+        verify(player).startTrack(track1, false);
+        assertEquals(List.of(track2), scheduler.getQueue());
     }
 
     @Test
-    @DisplayName("큐가 비어있으면 재생을 중지한다")
+    @DisplayName("큐가 비어있을 때 넘기면 재생을 중지한다")
     void shouldStopPlayingWhenQueueIsEmpty() {
-        // given
-        // 큐가 비어있는 상태
-
         // when
-        scheduler.nextTrack();
+        scheduler.skip();
 
         // then
-        verify(player, times(1)).startTrack(null, false);
+        verify(player).startTrack(null, false);
         assertTrue(scheduler.getQueue().isEmpty());
     }
 
     @Test
-    @DisplayName("트랙이 종료되면 자동으로 다음 트랙을 재생한다")
-    void shouldPlayNextTrackAutomaticallyWhenTrackEnds() {
+    @DisplayName("정지하면 대기열을 비우고 재생을 멈춘다")
+    void shouldClearQueueAndStopOnStop() {
         // given
-        lenient().when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
         scheduler.queue(track1);
-        scheduler.queue(track2);
-        
-        when(player.startTrack(any(AudioTrack.class), eq(false))).thenReturn(true);
-        AudioTrackEndReason endReason = AudioTrackEndReason.FINISHED;
 
         // when
-        scheduler.onTrackEnd(player, track1, endReason);
+        scheduler.stop();
 
         // then
-        verify(player, times(1)).startTrack(track1, false);
-        assertEquals(1, scheduler.getQueue().size());
+        verify(player).stopTrack();
+        assertTrue(scheduler.getQueue().isEmpty());
+    }
+
+    @Test
+    @DisplayName("트랙이 끝나면 자동으로 다음 트랙을 재생한다")
+    void shouldPlayNextTrackAutomaticallyWhenTrackEnds() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        scheduler.queue(track1);
+        scheduler.queue(track2);
+        when(player.getPlayingTrack()).thenReturn(null); // 곡이 끝나서 비어 있음
+
+        // when
+        scheduler.onTrackEnd(player, originalTrack, AudioTrackEndReason.FINISHED);
+
+        // then
+        verify(player).startTrack(track1, false);
+        assertEquals(List.of(track2), scheduler.getQueue());
     }
 
     @Test
     @DisplayName("종료 이유가 다음 재생을 허용하지 않으면 다음 트랙을 재생하지 않는다")
     void shouldNotPlayNextTrackWhenEndReasonDoesNotAllowIt() {
         // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
         scheduler.queue(track1);
-        scheduler.queue(track2);
-        
-        AudioTrackEndReason endReason = AudioTrackEndReason.STOPPED; // mayStartNext = false
 
         // when
-        scheduler.onTrackEnd(player, track1, endReason);
+        scheduler.onTrackEnd(player, originalTrack, AudioTrackEndReason.STOPPED);
 
         // then
-        verify(player, never()).startTrack(any(), eq(false));
-        assertEquals(2, scheduler.getQueue().size()); // 큐에 그대로 남아있음
+        verify(player, never()).startTrack(any(), anyBoolean());
+        assertEquals(List.of(track1), scheduler.getQueue());
     }
 
     @Test
-    @DisplayName("큐를 안전하게 반환한다")
-    void shouldReturnQueueSafely() {
+    @DisplayName("곡이 끝난 사이에 다른 곡이 이미 시작됐으면 다음 트랙으로 넘기지 않는다")
+    void shouldNotSkipWhenAnotherTrackAlreadyStarted() {
         // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
         scheduler.queue(track1);
-        scheduler.queue(track2);
 
-        // when
-        Queue<AudioTrack> queue = scheduler.getQueue();
+        // when: 종료 이벤트가 처리되기 전에 이미 다른 곡이 재생 중
+        scheduler.onTrackEnd(player, track2, AudioTrackEndReason.FINISHED);
 
         // then
-        assertNotNull(queue);
-        assertEquals(2, queue.size());
-        // 원본 큐를 반환하므로 수정 가능해야 함
-        queue.clear();
+        verify(player, never()).startTrack(any(), anyBoolean());
+        assertEquals(List.of(track1), scheduler.getQueue());
+    }
+
+    @Test
+    @DisplayName("반환된 대기열은 복사본이라 수정할 수 없다")
+    void shouldReturnUnmodifiableQueueSnapshot() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        scheduler.queue(track1);
+
+        // when
+        List<AudioTrack> queue = scheduler.getQueue();
+
+        // then
+        assertThrows(UnsupportedOperationException.class, queue::clear);
+        assertEquals(List.of(track1), scheduler.getQueue());
+    }
+
+    @Test
+    @DisplayName("여러 스레드에서 동시에 추가해도 모든 트랙이 대기열에 들어간다")
+    void shouldHandleConcurrentQueueOperations() throws Exception {
+        // given: 실제 단일 스레드 executor 사용
+        ScheduledExecutorService realExecutor = Executors.newSingleThreadScheduledExecutor();
+        try {
+            TrackScheduler realScheduler = new TrackScheduler(player, realExecutor);
+            when(player.getPlayingTrack()).thenReturn(originalTrack);
+
+            // when
+            Thread t1 = new Thread(() -> {
+                for (int i = 0; i < 10; i++) {
+                    realScheduler.queue(track1);
+                }
+            });
+            Thread t2 = new Thread(() -> {
+                for (int i = 0; i < 10; i++) {
+                    realScheduler.queue(track2);
+                }
+            });
+            t1.start();
+            t2.start();
+            t1.join();
+            t2.join();
+            realExecutor.submit(() -> { }).get(5, TimeUnit.SECONDS); // 앞서 넘긴 작업이 끝날 때까지 대기
+
+            // then
+            assertEquals(20, realScheduler.getQueue().size());
+        } finally {
+            realExecutor.shutdownNow();
+        }
+    }
+
+    // ─────────────────────────────
+    // 입장곡
+    // ─────────────────────────────
+
+    @Test
+    @DisplayName("입장곡이 끝나면 원래 곡을 멈췄던 위치부터 다시 재생한다")
+    void shouldResumeOriginalTrackAfterEntrySong() {
+        // given
+        givenOriginalTrackPlayingAt(42_000L);
+
+        // when
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+
+        // then: 입장곡 재생 + 종료 예약
+        verify(player).startTrack(entryTrack, false);
+        verify(executor).schedule(any(Runnable.class), eq(ENTRY_DURATION_MS), eq(TimeUnit.MILLISECONDS));
+        verify(originalClone).setPosition(42_000L);
+
+        // when: 재생 시간이 지남
+        scheduledTasks.get(0).run();
+
+        // then
+        verify(player).startTrack(originalClone, false);
+    }
+
+    @Test
+    @DisplayName("원래 곡이 없을 때 입장곡 중에 추가된 곡은 입장곡이 끝나면 재생된다")
+    void shouldPlayTrackQueuedDuringEntrySong() {
+        // given: 아무것도 재생 중이지 않은 상태에서 입장곡 시작
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+        when(player.getPlayingTrack()).thenReturn(entryTrack);
+        scheduler.queue(track1); // 입장곡 재생 중이라 대기열로 감
+
+        // when
+        scheduledTasks.get(0).run();
+
+        // then
+        verify(player).startTrack(track1, false);
         assertTrue(scheduler.getQueue().isEmpty());
     }
 
     @Test
-    @DisplayName("동시에 큐 작업을 처리한다")
-    void shouldHandleConcurrentQueueOperations() throws InterruptedException {
+    @DisplayName("입장곡이 겹쳐도 처음 재생 중이던 원래 곡으로 돌아간다")
+    void shouldResumeOriginalTrackWhenEntrySongsOverlap() {
         // given
-        when(player.startTrack(any(AudioTrack.class), eq(true))).thenReturn(false);
-        
-        // when
-        Thread t1 = new Thread(() -> {
-            for (int i = 0; i < 10; i++) {
-                scheduler.queue(track1);
-            }
-        });
-        Thread t2 = new Thread(() -> {
-            for (int i = 0; i < 10; i++) {
-                scheduler.queue(track2);
-            }
-        });
-        
-        t1.start();
-        t2.start();
-        t1.join();
-        t2.join();
+        givenOriginalTrackPlayingAt(42_000L);
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+
+        // when: 첫 입장곡이 끝나기 전에 다른 사람이 들어옴
+        scheduler.playEntrySong(otherEntryTrack, ENTRY_DURATION_MS);
+
+        // then: 첫 입장곡의 종료 예약은 취소되고, 원래 곡은 한 번만 백업됨
+        verify(future).cancel(false);
+        verify(originalTrack, times(1)).makeClone();
+        verify(player).startTrack(otherEntryTrack, false);
+
+        // when: 첫 입장곡 예약이 늦게 실행되어도 무시되고, 두 번째 입장곡이 끝나면 원래 곡으로 복귀
+        scheduledTasks.get(0).run();
+        verify(player, never()).startTrack(originalClone, false);
+        scheduledTasks.get(1).run();
 
         // then
-        assertEquals(20, scheduler.getQueue().size());
+        verify(player).startTrack(originalClone, false);
+    }
+
+    @Test
+    @DisplayName("입장곡이 정해진 시간보다 먼저 끝나면 바로 원래 곡으로 돌아가고, 예약된 복귀는 무시된다")
+    void shouldResumeImmediatelyWhenEntrySongEndsEarly() {
+        // given
+        givenOriginalTrackPlayingAt(42_000L);
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+
+        // when
+        scheduler.onTrackEnd(player, entryTrack, AudioTrackEndReason.FINISHED);
+
+        // then
+        verify(player).startTrack(originalClone, false);
+
+        // when: 예약된 복귀가 뒤늦게 실행됨
+        scheduledTasks.get(0).run();
+
+        // then: 원래 곡을 다시 시작하지 않음
+        verify(player, times(1)).startTrack(originalClone, false);
+    }
+
+    @Test
+    @DisplayName("입장곡 재생 중 넘기면 입장곡만 끝내고 원래 곡으로 돌아간다")
+    void shouldResumeOriginalTrackWhenSkippingEntrySong() {
+        // given
+        givenOriginalTrackPlayingAt(42_000L);
+        scheduler.queue(track1);
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+
+        // when
+        scheduler.skip();
+
+        // then
+        verify(player).startTrack(originalClone, false);
+        assertEquals(List.of(track1), scheduler.getQueue());
+    }
+
+    @Test
+    @DisplayName("입장곡 재생 중 정지하면 원래 곡으로 돌아가지 않는다")
+    void shouldNotResumeAfterStopDuringEntrySong() {
+        // given
+        givenOriginalTrackPlayingAt(42_000L);
+        scheduler.playEntrySong(entryTrack, ENTRY_DURATION_MS);
+
+        // when
+        scheduler.stop();
+        scheduledTasks.get(0).run();
+
+        // then
+        verify(player).stopTrack();
+        verify(player, never()).startTrack(originalClone, false);
     }
 }
-

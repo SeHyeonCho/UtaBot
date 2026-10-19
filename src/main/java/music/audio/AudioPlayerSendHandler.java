@@ -1,4 +1,4 @@
-package music.handler;
+package music.audio;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.track.playback.AudioFrame;
@@ -10,11 +10,11 @@ import java.nio.ByteBuffer;
  * Lavaplayer의 AudioPlayer가 출력한 Opus 형식의 오디오를
  * Discord 음성 채널로 전달해주는 클래스 입니다.
  */
-public class AudioPlayerHandler implements AudioSendHandler {
+public class AudioPlayerSendHandler implements AudioSendHandler {
     private final AudioPlayer player;
     private final ByteBuffer buffer = ByteBuffer.allocate(1024 * 1024);
 
-    public AudioPlayerHandler(AudioPlayer player) {
+    public AudioPlayerSendHandler(AudioPlayer player) {
         this.player = player;
     }
 

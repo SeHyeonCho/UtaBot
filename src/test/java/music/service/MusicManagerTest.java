@@ -61,9 +61,8 @@ class MusicManagerTest {
 
         // then
         assertNotNull(serverMusic1);
-        assertNotNull(serverMusic1.player);
-        assertNotNull(serverMusic1.scheduler);
-        assertNotNull(serverMusic1.sendHandler);
+        assertTrue(serverMusic1.getQueue().isEmpty());
+        assertFalse(serverMusic1.isPlaying());
     }
 
     @Test
@@ -123,9 +122,8 @@ class MusicManagerTest {
         ServerMusicManager serverMusic = musicManager.of(guild1);
 
         // then
-        assertNotNull(serverMusic.player);
-        assertNotNull(serverMusic.scheduler);
-        assertNotNull(serverMusic.sendHandler);
+        assertTrue(serverMusic.getQueue().isEmpty());
+        assertFalse(serverMusic.isPlaying());
     }
 
     @Test

@@ -1,6 +1,6 @@
 import common.command.CommandRegister;
 import common.handler.DefaultCommandHandler;
-import common.handler.VoiceCommandHandler;
+import music.handler.VoiceCommandHandler;
 import entrysong.handler.EntrySongHandler;
 import music.handler.MusicCommandHandler;
 import upload.handler.UploadHandler;

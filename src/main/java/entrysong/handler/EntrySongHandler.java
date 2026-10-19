@@ -6,14 +6,10 @@ import music.service.ServerMusicManager;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 
-import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.middleman.AudioChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
-import net.dv8tion.jda.api.managers.AudioManager;
 import entrysong.repository.EntrySongConfig;
 import entrysong.repository.EntrySongRegistry;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
@@ -142,12 +138,12 @@ public class EntrySongHandler extends ListenerAdapter {
             return;
         }
 
-        Guild guild = event.getGuild();
-        ServerMusicManager music = MusicManager.get().of(guild);
-        prepareAudioConnection(guild, music, event.getChannelJoined());
+        ServerMusicManager music = MusicManager.get().of(event.getGuild());
+        if (!moveToJoinedChannel(music, event.getChannelJoined())) {
+            return;
+        }
 
-        AtomicReference<AudioTrack> originalCloneRef = backupCurrentTrack(music);
-        loadAndPlayEntrySong(music, originalCloneRef, sourceInfo);
+        loadAndPlayEntrySong(music, sourceInfo);
     }
 
     private boolean shouldProcessVoiceUpdate(GuildVoiceUpdateEvent event) {
@@ -171,13 +167,11 @@ public class EntrySongHandler extends ListenerAdapter {
 
     private static class EntrySongSource {
         final String source;
-        final boolean isUrl;
         final int startSec;
         final int durationSec;
 
-        EntrySongSource(String source, boolean isUrl, int startSec, int durationSec) {
+        EntrySongSource(String source, int startSec, int durationSec) {
             this.source = source;
-            this.isUrl = isUrl;
             this.startSec = startSec;
             this.durationSec = durationSec;
         }
@@ -200,7 +194,7 @@ public class EntrySongHandler extends ListenerAdapter {
 
         if (src.startsWith("http://") || src.startsWith("https://")) {
             System.out.println("[EntrySong] using URL entry song: " + src);
-            return new EntrySongSource(src, true, cfg.startSec, cfg.durationSec);
+            return new EntrySongSource(src, cfg.startSec, cfg.durationSec);
         }
 
         Path candidatePath = Path.of("uploads", src);
@@ -208,7 +202,7 @@ public class EntrySongHandler extends ListenerAdapter {
 
         if (Files.exists(candidatePath)) {
             System.out.println("[EntrySong] using registry file: " + candidatePath.toAbsolutePath());
-            return new EntrySongSource(candidatePath.toString(), false, cfg.startSec, cfg.durationSec);
+            return new EntrySongSource(candidatePath.toString(), cfg.startSec, cfg.durationSec);
         }
 
         System.out.println("[EntrySong] registry file not found, fallback to username#disc.mp3");
@@ -229,137 +223,58 @@ public class EntrySongHandler extends ListenerAdapter {
                 username + "#" + discriminator +
                 ", path=" + candidatePath.toAbsolutePath());
 
-        return new EntrySongSource(candidatePath.toString(), false, 0, DEFAULT_ENTRY_DURATION_SEC);
+        return new EntrySongSource(candidatePath.toString(), 0, DEFAULT_ENTRY_DURATION_SEC);
     }
 
-    private void prepareAudioConnection(Guild guild, 
-                                       ServerMusicManager music,
-                                       AudioChannel joinedChannel) {
-        AudioManager audioManager = guild.getAudioManager();
-        System.out.println("[EntrySong] audioManager connected? " + audioManager.isConnected());
+    /**
+     * 입장한 채널로 봇을 이동시킵니다.
+     *
+     * 봇이 다른 채널에서 음악을 재생 중이면 듣고 있는 사람들을 위해 이동하지 않습니다.
+     *
+     * @return 입장곡을 재생해도 되면 true
+     */
+    private boolean moveToJoinedChannel(ServerMusicManager music, AudioChannel joinedChannel) {
+        AudioChannel current = music.getConnectedChannel();
+        boolean sameChannel = current != null && current.getIdLong() == joinedChannel.getIdLong();
 
-        if (audioManager.getSendingHandler() == null) {
-            System.out.println("[EntrySong] no sendingHandler, setting from ServerMusicManager.");
-            audioManager.setSendingHandler(music.getSendHandler());
+        if (sameChannel) {
+            return true;
         }
 
-        audioManager.openAudioConnection(joinedChannel);
-    }
-
-    private AtomicReference<AudioTrack> backupCurrentTrack(ServerMusicManager music) {
-        AtomicReference<AudioTrack> originalCloneRef = new AtomicReference<>(null);
-        AudioTrack original = music.player.getPlayingTrack();
-
-        if (original != null) {
-            System.out.println("[EntrySong] currently playing track exists, backing up.");
-            AudioTrack clone = original.makeClone();
-            clone.setPosition(original.getPosition());
-            originalCloneRef.set(clone);
-        } else {
-            System.out.println("[EntrySong] no track currently playing.");
+        if (current != null && music.isPlaying()) {
+            System.out.println("[EntrySong] skip: bot is playing in another channel (" + current.getName() + ")");
+            return false;
         }
 
-        return originalCloneRef;
+        music.connect(joinedChannel);
+        return true;
     }
 
-    private void loadAndPlayEntrySong(ServerMusicManager music,
-                                     AtomicReference<AudioTrack> originalCloneRef,
-                                     EntrySongSource sourceInfo) {
-        if (sourceInfo.isUrl) {
-            loadEntrySongFromUrl(music, originalCloneRef, sourceInfo);
-        } else {
-            loadEntrySongFromFile(music, originalCloneRef, sourceInfo);
-        }
-    }
-
-    private void loadEntrySongFromUrl(ServerMusicManager music,
-                                     AtomicReference<AudioTrack> originalCloneRef,
-                                     EntrySongSource sourceInfo) {
-        System.out.println("[EntrySong] loading URL via Lavaplayer: " + sourceInfo.source +
+    private void loadAndPlayEntrySong(ServerMusicManager music, EntrySongSource sourceInfo) {
+        System.out.println("[EntrySong] loading: " + sourceInfo.source +
                 " (start=" + sourceInfo.startSec + ", duration=" + sourceInfo.durationSec + ")");
 
-        MusicManager.get().playerManager().loadItemOrdered(
-                music,
-                sourceInfo.source,
-                createEntrySongHandler(music, originalCloneRef, sourceInfo.source, 
-                        sourceInfo.startSec, sourceInfo.durationSec)
-        );
+        music.load(sourceInfo.source, createEntrySongHandler(music, sourceInfo));
     }
 
-    private void loadEntrySongFromFile(ServerMusicManager music,
-                                      AtomicReference<AudioTrack> originalCloneRef,
-                                      EntrySongSource sourceInfo) {
-        System.out.println("[EntrySong] loading file: " + Path.of(sourceInfo.source).toAbsolutePath() +
-                " (start=" + sourceInfo.startSec + ", duration=" + sourceInfo.durationSec + ")");
-
-        MusicManager.get().playerManager().loadItemOrdered(
-                music,
-                sourceInfo.source,
-                createEntrySongHandler(music, originalCloneRef, sourceInfo.source,
-                        sourceInfo.startSec, sourceInfo.durationSec)
-        );
-    }
-
-    private AudioLoadResultHandler createEntrySongHandler(
-            ServerMusicManager music,
-            AtomicReference<AudioTrack> originalCloneRef,
-            String playSource,   // 실제로 lavaplayer에 넘길 URL 또는 파일 경로
-            int startSec,
-            int durationSec
-    ) {
-        final String finalPlaySource = playSource;
-        final int finalStartSec = startSec;
-        final int finalDurationSec = durationSec;
-
+    private AudioLoadResultHandler createEntrySongHandler(ServerMusicManager music,
+                                                          EntrySongSource sourceInfo) {
         return new AudioLoadResultHandler() {
 
             @Override
             public void trackLoaded(AudioTrack entryTrack) {
-                System.out.println("[EntrySong] trackLoaded OK: " + finalPlaySource +
+                System.out.println("[EntrySong] trackLoaded OK: " + sourceInfo.source +
                         ", trackDuration=" + entryTrack.getDuration() + "ms");
 
-                long startPosMs = finalStartSec * 1000L;
+                long startPosMs = sourceInfo.startSec * 1000L;
                 if (startPosMs >= entryTrack.getDuration()) {
                     System.out.println("[EntrySong] start position is beyond track duration, skip entry song.");
-                    AudioTrack restore = originalCloneRef.get();
-                    if (restore != null) {
-                        music.player.startTrack(restore, false);
-                    }
                     return;
                 }
                 entryTrack.setPosition(startPosMs);
 
-                boolean started = music.player.startTrack(entryTrack, false);
-                System.out.println("[EntrySong] startTrack(entry) returned = " + started);
-
-                if (!started) {
-                    System.out.println("[EntrySong] entry track did NOT start. Keep original track.");
-                    AudioTrack restore = originalCloneRef.get();
-                    if (restore != null) {
-                        music.player.startTrack(restore, false);
-                    }
-                    return;
-                }
-
+                music.playEntrySong(entryTrack, sourceInfo.durationSec * 1000L);
                 System.out.println("[EntrySong] entry track started.");
-
-                ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-                scheduler.schedule(() -> {
-                    try {
-                        System.out.println("[EntrySong] entry duration reached, restoring original track.");
-                        music.player.stopTrack();
-
-                        AudioTrack restore = originalCloneRef.get();
-                        if (restore != null) {
-                            music.player.startTrack(restore, false);
-                            System.out.println("[EntrySong] original track restored.");
-                        } else {
-                            System.out.println("[EntrySong] no original track to restore.");
-                        }
-                    } finally {
-                        scheduler.shutdown();
-                    }
-                }, finalDurationSec, TimeUnit.SECONDS);
             }
 
             @Override
@@ -369,12 +284,12 @@ public class EntrySongHandler extends ListenerAdapter {
 
             @Override
             public void noMatches() {
-                System.out.println("[EntrySong] noMatches for source = " + finalPlaySource);
+                System.out.println("[EntrySong] noMatches for source = " + sourceInfo.source);
             }
 
             @Override
             public void loadFailed(FriendlyException e) {
-                System.out.println("[EntrySong] loadFailed for source = " + finalPlaySource);
+                System.out.println("[EntrySong] loadFailed for source = " + sourceInfo.source);
                 e.printStackTrace();
             }
         };
