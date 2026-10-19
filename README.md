@@ -27,59 +27,67 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ## 입장곡(Entry Song) 기능
 
+입장곡은 **서버별로** 따로 설정됩니다. 같은 유저라도 서버마다 다른 입장곡을 쓸 수 있습니다.
+
 ### 1. 업로드 채널 기반 mp3 입장곡
 - `/setuploadchannel <채널>`  
   - 서버별로 **mp3 업로드 전용 텍스트 채널**을 설정
 - 설정된 업로드 채널에 `.mp3` 파일을 올리면:
-  - 서버 로컬 `uploads/` 폴더에  
-    `username#discriminator.mp3` 형식으로 자동 저장  
-    (예: `우타#2960.mp3`)
-  - 해당 유저의 입장곡으로 자동 등록
+  - 서버 로컬 `uploads/{서버ID}/{유저ID}.mp3` 로 자동 저장
+  - 그 서버에서 해당 유저의 입장곡으로 자동 등록
   - 기본 재생 구간: `0초 ~ 10초`
 
 ### 2. 유튜브 URL 기반 입장곡
 - `/setentrysong <url>`  
-  - 유튜브(또는 기타 지원 URL)를 **입장곡으로 설정**
+  - 유튜브 URL을 그 서버의 **입장곡으로 설정**
   - 내부적으로 Lavaplayer의 `youtube-source`를 통해 YouTube URL을 처리하여 재생
-  - `music.youtube.com`, `youtu.be` 등도 정규화하여 처리 가능
+  - `music.youtube.com`, `youtu.be` 주소도 처리 가능
+  - 기본 재생 구간: `0초 ~ 7초`
 
 ### 3. 입장곡 재생 구간 설정
 - `/setentrytime <start> <duration>`  
-  - 현재 유저의 입장곡(로컬 mp3 또는 URL)에 대해  
+  - 그 서버에 설정된 내 입장곡(로컬 mp3 또는 URL)에 대해  
     재생 시작 지점과 재생 길이(초)를 설정
   - 예: `/setentrytime start:5 duration:7`  
     → 5초부터 7초 동안 재생
 
 ### 4. 입장 시 동작 방식
 - 유저가 음성 채널에 **입장**하면:
-  1. 해당 유저의 `username#discriminator` 키로 EntrySongRegistry 조회
-  2. 우선 **레지스트리에 등록된 입장곡** 사용  
+  1. (서버 ID, 유저 ID)로 입장곡 설정 조회
      - URL이면 → Lavaplayer의 `youtube-source`를 통해 재생  
-     - 파일명이면 → `uploads/파일명` 에서 mp3 재생
-  3. 레지스트리에 없으면  
-     `uploads/{username}#{discriminator}.mp3` 가 존재할 경우 이를 fallback 입장곡으로 사용
-  4. 입장곡 재생 전, 현재 재생 중인 트랙이 있으면:
-     - 현재 트랙을 clone + position 저장
-     - 입장곡을 **덮어쓰기 모드로 재생**
-     - 지정된 duration 이후:
-       - 입장곡 정지
-       - 이전에 백업해둔 트랙을 원래 위치에서 다시 재생
+     - 파일이면 → `uploads/{서버ID}/{유저ID}.mp3` 재생
+  2. 봇이 **다른 채널에서 음악을 재생 중이면** 듣는 사람들을 위해 이동하지 않고 입장곡을 건너뜀
+  3. 현재 재생 중인 트랙이 있으면:
+     - 현재 트랙을 멈춘 위치를 기억하고 입장곡을 재생
+     - 지정된 duration 이후 원래 트랙을 멈췄던 위치부터 다시 재생
+     - 원래 트랙이 없었으면 대기열의 다음 곡을 재생
+  4. 입장곡이 끝나기 전에 다른 사람이 들어오면 입장곡만 교체되고, 마지막 입장곡이 끝나면 원래 트랙으로 돌아감
 
 ---
 
 ## 설정 및 상태 저장
 
-- 입장곡 설정 정보는 `EntrySongRegistry`(`entrysong.repository.EntrySongRegistry`)를 통해 관리
-  - 키: `username#discriminator`
-  - 값: `fileName(또는 URL)`, `startSec`, `durationSec`
-- 설정 정보는 JSON 파일(`data/entry-songs.json`)에 저장되며:
+- 입장곡 설정 정보는 `EntrySongRepository`(`entrysong.repository.EntrySongRepository`)를 통해 관리
+  - 키: 서버 ID → 유저 ID
+  - 값: `source`(업로드 파일명 또는 URL), `startSec`, `durationSec`
+- 설정 정보는 JSON 파일(`data/server-entry-songs.json`)에 저장되며:
   - 봇 시작 시 디스크에서 로드
   - `/setentrysong`, `/setentrytime`, mp3 업로드 시마다 자동으로 저장
   - 서버를 껐다 켜도 **입장곡 설정 유지**
 
-- 업로드 채널 정보는 `UploadChannelRegistry`(`upload.repository.UploadChannelRegistry`)에서 서버별로 관리
+- 업로드 채널 정보는 `UploadChannelRepository`(`entrysong.repository.UploadChannelRepository`)에서 서버별로 관리
   - 서버 ID → 업로드 채널 ID 매핑
   - 메모리 내에서 관리 (재시작 시 초기화)
+
+### 예전 입장곡 데이터 이전
+예전 버전은 입장곡을 `username#discriminator` 기준으로 모든 서버에 공통으로 저장했습니다
+(`data/entry-songs.json`, `uploads/username#0000.mp3`).
+봇을 시작할 때 이 데이터가 남아 있으면 자동으로 새 구조로 옮깁니다.
+
+- 봇이 들어가 있는 각 서버에서 이름이 일치하는 멤버를 찾아, **그 유저가 속한 모든 서버**에 입장곡을 복사
+- 새 구조에 이미 설정이 있는 유저는 덮어쓰지 않음
+- 옮긴 뒤 예전 파일은 `data/legacy/`, `uploads/legacy/` 로 옮겨 백업 (확인 후 지워도 됨)
+- 주인을 찾지 못한 항목(서버를 떠난 유저 등)은 로그에 출력되고 백업 폴더에만 남음
 
 ---
 
@@ -87,34 +95,38 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ```
 src/main/java/
-├── Main.java                          # 봇 진입점
+├── Main.java                          # 봇 진입점 (객체 생성/연결, 예전 데이터 이전)
 ├── common/                            # 공통 기능
 │   ├── command/
 │   │   └── CommandRegister.java      # 슬래시 명령어 등록
 │   ├── handler/
-│   │   ├── DefaultCommandHandler.java # 기본 명령어 (ping, echo)
-│   │   └── VoiceCommandHandler.java  # 보이스 채널 명령어 (join, leave)
+│   │   └── DefaultCommandHandler.java # 기본 명령어 (ping, echo)
 │   └── util/
 │       └── CommandUtils.java         # 명령어 유틸리티
 ├── music/                             # 음악 재생 기능
+│   ├── audio/
+│   │   ├── AudioPlayerManagerFactory.java # LavaPlayer 설정, youtube-source 등록
+│   │   └── AudioPlayerSendHandler.java    # LavaPlayer 오디오를 Discord로 전송
 │   ├── handler/
 │   │   ├── MusicCommandHandler.java   # 음악 명령어 (play, skip, stop, queue, volume)
-│   │   └── AudioPlayerHandler.java   # LavaPlayer 오디오 전송 핸들러
+│   │   └── VoiceCommandHandler.java   # 보이스 채널 명령어 (join, leave)
 │   └── service/
 │       ├── MusicManager.java          # 서버별 음악 매니저 관리
-│       ├── ServerMusicManager.java   # 서버별 음악 재생 구성 요소
-│       └── TrackScheduler.java       # 트랙 대기열 관리
-├── entrysong/                         # 입장곡 기능
-│   ├── handler/
-│   │   └── EntrySongHandler.java      # 입장곡 명령어 및 이벤트 처리
-│   └── repository/
-│       ├── EntrySongConfig.java       # 입장곡 설정 데이터 클래스
-│       └── EntrySongRegistry.java     # 입장곡 레지스트리 (JSON 저장/로드)
-└── upload/                            # 파일 업로드 기능
+│       ├── ServerMusicManager.java    # 서버별 재생 제어 + 음성 연결
+│       └── TrackScheduler.java        # 트랙 대기열, 입장곡 끼워넣기
+└── entrysong/                         # 입장곡 기능
     ├── handler/
-    │   └── UploadHandler.java         # mp3 업로드 채널 처리
-    └── repository/
-        └── UploadChannelRegistry.java # 업로드 채널 레지스트리
+    │   ├── EntrySongHandler.java      # 입장곡 명령어 및 입장 이벤트 처리
+    │   └── EntrySongUploadHandler.java # mp3 업로드 채널 처리
+    ├── model/
+    │   └── EntrySongConfig.java       # 입장곡 설정 데이터 클래스
+    ├── repository/
+    │   ├── EntrySongRepository.java   # 서버별 입장곡 저장소 (JSON 저장/로드)
+    │   └── UploadChannelRepository.java # 서버별 업로드 채널 저장소
+    └── service/
+        ├── EntrySongService.java      # 입장곡 설정, 업로드 파일 규칙
+        ├── EntrySongSource.java       # 입장 시 재생할 입장곡 정보
+        └── LegacyEntrySongMigration.java # 예전 입장곡 데이터 이전
 ```
 
 ---

@@ -11,6 +11,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import entrysong.repository.EntrySongRepository;
+import entrysong.service.EntrySongService;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
 import com.sedmelluq.discord.lavaplayer.player.AudioLoadResultHandler;
@@ -18,6 +21,7 @@ import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioPlaylist;
 import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 
+import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -39,6 +43,14 @@ class EntrySongHandlerTest {
     private EntrySongHandler handler;
     private String token;
 
+    @TempDir
+    Path tempDir;
+
+    private EntrySongHandler newHandler() {
+        EntrySongRepository repository = new EntrySongRepository(tempDir.resolve("entry-songs.json"));
+        return new EntrySongHandler(new EntrySongService(repository, tempDir.resolve("uploads")));
+    }
+
     @BeforeEach
     void setUp() throws InterruptedException {
         // .env 파일에서 토큰 읽기
@@ -49,7 +61,7 @@ class EntrySongHandlerTest {
         assertNotNull(token, ".env 파일에 TOKEN이 설정되어 있지 않습니다.");
         assertFalse(token.isEmpty(), ".env 파일의 TOKEN이 비어있습니다.");
 
-        handler = new EntrySongHandler();
+        handler = newHandler();
         
         CountDownLatch readyLatch = new CountDownLatch(1);
         
@@ -90,7 +102,7 @@ class EntrySongHandlerTest {
     @DisplayName("EntrySongHandler 인스턴스를 생성할 수 있다")
     void shouldCreateEntrySongHandler() {
         // when
-        EntrySongHandler handler = new EntrySongHandler();
+        EntrySongHandler handler = newHandler();
 
         // then
         assertNotNull(handler);
@@ -100,7 +112,7 @@ class EntrySongHandlerTest {
     @DisplayName("EntrySongHandler가 ListenerAdapter를 상속한다")
     void shouldExtendListenerAdapter() {
         // when
-        EntrySongHandler handler = new EntrySongHandler();
+        EntrySongHandler handler = newHandler();
 
         // then
         assertTrue(handler instanceof ListenerAdapter);
@@ -113,7 +125,7 @@ class EntrySongHandlerTest {
         assertNotNull(token, ".env 파일에 TOKEN이 설정되어 있지 않습니다.");
 
         // when
-        EntrySongHandler handler = new EntrySongHandler();
+        EntrySongHandler handler = newHandler();
         JDA testJda = JDABuilder.create(
                 token,
                 GatewayIntent.GUILD_MESSAGES,
