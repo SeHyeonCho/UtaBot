@@ -5,7 +5,8 @@ import com.sedmelluq.discord.lavaplayer.player.AudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.player.DefaultAudioPlayerManager;
 import com.sedmelluq.discord.lavaplayer.source.AudioSourceManagers;
 import dev.lavalink.youtube.YoutubeAudioSourceManager;
-import dev.lavalink.youtube.clients.Android;
+import dev.lavalink.youtube.clients.AndroidVr;
+import dev.lavalink.youtube.clients.Music;
 import dev.lavalink.youtube.clients.Web;
 import dev.lavalink.youtube.clients.WebEmbedded;
 
@@ -29,10 +30,12 @@ public final class AudioPlayerManagerFactory {
         conf.setOpusEncodingQuality(10);
         conf.setFilterHotSwapEnabled(true);
 
-        // youtube-source 등록 (여러 클라이언트 사용으로 안정성 향상)
+        // youtube-source 등록. 클라이언트는 youtube-source README의 권장 구성을 따름
+        // (앞에서부터 차례로 시도, ANDROID는 "자주 동작하지 않음"으로 안내되어 제외)
         YoutubeAudioSourceManager ytSourceManager = new YoutubeAudioSourceManager(
+                new Music(),
+                new AndroidVr(),
                 new Web(),
-                new Android(),
                 new WebEmbedded()
         );
         playerManager.registerSourceManager(ytSourceManager);

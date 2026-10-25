@@ -7,12 +7,13 @@ version = '1.0-SNAPSHOT'
 
 repositories {
     mavenCentral()
-    maven { url 'https://jitpack.io' }
+    // youtube-source 공식 저장소
+    maven { url 'https://maven.lavalink.dev/releases' }
 }
 
 dependencies {
     implementation("dev.arbjerg:lavaplayer:2.2.4")
-    implementation("com.github.lavalink-devs:youtube-source:1.16.0")
+    implementation("dev.lavalink.youtube:v2:1.18.2")
     implementation("io.github.cdimascio:dotenv-java:3.0.0")
     implementation("net.dv8tion:JDA:6.7.0")
     // 디스코드 음성 종단간 암호화(DAVE) 구현. 2026년 3월부터 DAVE 없이는 음성 연결이 거부됨

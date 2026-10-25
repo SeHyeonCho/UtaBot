@@ -45,6 +45,7 @@ public class Main {
     private static final Path ENTRY_SONG_STORE = Path.of("data", "server-entry-songs.json");
     private static final Path LEGACY_ENTRY_SONG_STORE = Path.of("data", "entry-songs.json");
     private static final Path UPLOAD_DIR = Path.of("uploads");
+    private static final Path MUSIC_DIR = Path.of("music");
 
     public static void main(String[] args) throws InterruptedException {
         Dotenv dotenv = Dotenv.load();
@@ -66,7 +67,7 @@ public class Main {
                 new JoinCommand(musicManager),
                 new LeaveCommand(musicManager),
                 // 음악
-                new PlayCommand(musicManager),
+                new PlayCommand(musicManager, MUSIC_DIR),
                 new SkipCommand(musicManager),
                 new StopCommand(musicManager),
                 new QueueCommand(musicManager),

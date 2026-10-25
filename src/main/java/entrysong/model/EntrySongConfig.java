@@ -1,5 +1,7 @@
 package entrysong.model;
 
+import common.util.UrlUtils;
+
 /**
  * 한 서버에서 한 유저의 입장곡 설정입니다.
  */
@@ -15,7 +17,7 @@ public class EntrySongConfig {
     }
 
     public static boolean isUrl(String value) {
-        return value.startsWith("http://") || value.startsWith("https://");
+        return UrlUtils.isHttpUrl(value);
     }
 
     public boolean isUrl() {
