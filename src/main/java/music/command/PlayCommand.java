@@ -58,6 +58,7 @@ public class PlayCommand implements SlashCommand {
         return new AudioLoadResultHandler() {
             @Override
             public void trackLoaded(AudioTrack track) {
+                track.setUserData(event.getChannel()); // 재생 중 오류를 알릴 채널
                 music.queue(track);
                 event.getHook().sendMessage("▶️ 재생/추가: **" + track.getInfo().title + "**").queue();
             }
@@ -89,6 +90,7 @@ public class PlayCommand implements SlashCommand {
 
         // 모든 트랙을 큐에 추가
         for (AudioTrack track : playlist.getTracks()) {
+            track.setUserData(event.getChannel());
             music.queue(track);
         }
 

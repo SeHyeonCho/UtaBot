@@ -1,8 +1,12 @@
 package music.service;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -257,6 +261,36 @@ class TrackSchedulerTest {
         } finally {
             realExecutor.shutdownNow();
         }
+    }
+
+    @Test
+    @DisplayName("재생 중 오류가 나면 곡을 요청한 채널에 이유를 알린다")
+    void shouldNotifyRequestChannelOnTrackException() {
+        // given
+        MessageChannel channel = mock(MessageChannel.class);
+        MessageCreateAction action = mock(MessageCreateAction.class);
+        when(channel.sendMessage(any(CharSequence.class))).thenReturn(action);
+        when(track1.getUserData()).thenReturn(channel);
+        when(track1.getInfo()).thenReturn(new AudioTrackInfo("노래", "가수", 1000L, "id", false, "uri"));
+
+        // when
+        scheduler.onTrackException(player, track1,
+                new FriendlyException("This video requires login.", FriendlyException.Severity.COMMON, null));
+
+        // then
+        verify(channel).sendMessage("⚠️ **노래** 재생 중 오류가 나서 건너뜁니다: This video requires login.");
+        verify(action).queue();
+    }
+
+    @Test
+    @DisplayName("알릴 채널이 없는 트랙(입장곡 등)의 오류도 문제없이 처리한다")
+    void shouldHandleTrackExceptionWithoutChannel() {
+        // given
+        when(entryTrack.getInfo()).thenReturn(new AudioTrackInfo("입장곡", "가수", 1000L, "id", false, "uri"));
+
+        // when & then
+        assertDoesNotThrow(() -> scheduler.onTrackException(player, entryTrack,
+                new FriendlyException("failed", FriendlyException.Severity.COMMON, null)));
     }
 
     // ─────────────────────────────

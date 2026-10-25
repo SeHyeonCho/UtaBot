@@ -91,6 +91,18 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ---
 
+## 실행 환경
+
+- Java 17 이상
+- `.env` 파일에 `TOKEN=디스코드 봇 토큰`
+- 디스코드는 2026년 3월부터 음성 채널에 종단간 암호화(DAVE)를 요구합니다.
+  봇은 [libdave-jvm](https://github.com/KyokoBot/libdave-jvm)으로 이를 지원하며, 아래 OS에서 동작합니다.
+  - Linux (x86-64, aarch64), Windows (x86-64), macOS
+  - 다른 OS/CPU에서는 시작할 때 DAVE 라이브러리를 불러오지 못했다는 오류가 납니다.
+- Java 24 이상에서 네이티브 라이브러리 경고가 나오면 `java --enable-native-access=ALL-UNNAMED ...`로 실행하세요.
+
+---
+
 ## 프로젝트 구조
 
 ```

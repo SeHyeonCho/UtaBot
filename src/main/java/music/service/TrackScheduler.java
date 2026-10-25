@@ -2,8 +2,10 @@ package music.service;
 
 import com.sedmelluq.discord.lavaplayer.player.AudioPlayer;
 import com.sedmelluq.discord.lavaplayer.player.event.AudioEventAdapter;
+import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
+import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -125,6 +127,28 @@ public class TrackScheduler extends AudioEventAdapter {
     @Override
     public void onTrackEnd(AudioPlayer p, AudioTrack track, AudioTrackEndReason endReason) {
         run(() -> handleTrackEnd(track, endReason));
+    }
+
+    /**
+     * 트랙 재생 중 오류가 났을 때 호출되는 메서드 입니다.
+     *
+     * 오류 내용을 콘솔에 남기고, 곡을 요청한 채널이 있으면 그 채널에도 알립니다.
+     * 트랙은 이후 LOAD_FAILED로 끝나서 onTrackEnd에서 다음 곡으로 넘어갑니다.
+     */
+    @Override
+    public void onTrackException(AudioPlayer p, AudioTrack track, FriendlyException exception) {
+        System.out.println("[TrackScheduler] track exception: " + track.getInfo().title);
+        exception.printStackTrace();
+
+        if (track.getUserData() instanceof MessageChannel channel) {
+            channel.sendMessage("⚠️ **" + track.getInfo().title + "** 재생 중 오류가 나서 건너뜁니다: "
+                    + exception.getMessage()).queue();
+        }
+    }
+
+    @Override
+    public void onTrackStuck(AudioPlayer p, AudioTrack track, long thresholdMs) {
+        System.out.println("[TrackScheduler] track stuck for " + thresholdMs + "ms: " + track.getInfo().title);
     }
 
     private void handleTrackEnd(AudioTrack track, AudioTrackEndReason endReason) {

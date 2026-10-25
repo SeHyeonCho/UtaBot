@@ -21,6 +21,9 @@ import music.command.StopCommand;
 import music.command.VolumeCommand;
 import music.service.MusicManager;
 import io.github.cdimascio.dotenv.Dotenv;
+import moe.kyokobot.libdave.NativeDaveFactory;
+import moe.kyokobot.libdave.jda.LDJDADaveSessionFactory;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
@@ -46,6 +49,9 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
         Dotenv dotenv = Dotenv.load();
         String token = dotenv.get("TOKEN");
+
+        // DAVE 네이티브 라이브러리를 이 OS에서 쓸 수 있는지 먼저 확인 (없으면 음성 연결이 전부 실패함)
+        NativeDaveFactory.ensureAvailable();
 
         MusicManager musicManager = new MusicManager(AudioPlayerManagerFactory.create());
         EntrySongRepository entrySongRepository = new EntrySongRepository(ENTRY_SONG_STORE);
@@ -78,6 +84,9 @@ public class Main {
                         GatewayIntent.MESSAGE_CONTENT,
                         GatewayIntent.GUILD_VOICE_STATES
                 )
+                // 2026년 3월부터 디스코드 음성은 종단간 암호화(DAVE)를 지원해야만 연결됨
+                .setAudioModuleConfig(new AudioModuleConfig()
+                        .withDaveSessionFactory(new LDJDADaveSessionFactory(new NativeDaveFactory())))
                 .addEventListeners(
                         commandDispatcher,
                         new EntrySongJoinHandler(entrySongService, musicManager),
