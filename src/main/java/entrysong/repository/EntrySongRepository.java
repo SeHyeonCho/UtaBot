@@ -1,16 +1,12 @@
 package entrysong.repository;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import common.util.JsonFiles;
 import entrysong.model.EntrySongConfig;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -21,15 +17,15 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class EntrySongRepository {
 
-    private static final Gson GSON = new GsonBuilder()
-            .setPrettyPrinting()
-            .create();
     private static final Type STORE_TYPE =
             new TypeToken<Map<Long, Map<Long, EntrySongConfig>>>(){}.getType();
 
     private final Path storePath;
     private final Map<Long, Map<Long, EntrySongConfig>> songsByGuild = new ConcurrentHashMap<>();
 
+    /**
+     * @throws IllegalStateException 저장 파일을 읽을 수 없거나 형식이 잘못된 경우
+     */
     public EntrySongRepository(Path storePath) {
         this.storePath = storePath;
         loadFromDisk();
@@ -56,34 +52,19 @@ public class EntrySongRepository {
     }
 
     private void loadFromDisk() {
-        if (!Files.exists(storePath)) {
+        Map<Long, Map<Long, EntrySongConfig>> loaded = JsonFiles.read(storePath, STORE_TYPE);
+        if (loaded == null) {
             System.out.println("[EntrySongRepository] no store file, start empty.");
             return;
         }
 
-        try (BufferedReader reader = Files.newBufferedReader(storePath, StandardCharsets.UTF_8)) {
-            Map<Long, Map<Long, EntrySongConfig>> loaded = GSON.fromJson(reader, STORE_TYPE);
-            if (loaded != null) {
-                loaded.forEach((guildId, songs) -> songsByGuild.put(guildId, new ConcurrentHashMap<>(songs)));
-            }
-            System.out.println("[EntrySongRepository] loaded " + songsByGuild.size() + " servers.");
-        } catch (IOException e) {
-            System.out.println("[EntrySongRepository] load failed:");
-            e.printStackTrace();
-        }
+        loaded.forEach((guildId, songs) -> songsByGuild.put(guildId, new ConcurrentHashMap<>(songs)));
+        System.out.println("[EntrySongRepository] loaded " + songsByGuild.size() + " servers.");
     }
 
-    // 임시 파일에 쓴 뒤 교체해서, 저장 도중 종료돼도 기존 파일이 깨지지 않게 함
     private void saveToDisk() {
         try {
-            Path dir = storePath.toAbsolutePath().getParent();
-            Files.createDirectories(dir);
-
-            Path tempPath = Files.createTempFile(dir, storePath.getFileName().toString(), ".tmp");
-            try (BufferedWriter writer = Files.newBufferedWriter(tempPath, StandardCharsets.UTF_8)) {
-                GSON.toJson(songsByGuild, STORE_TYPE, writer);
-            }
-            Files.move(tempPath, storePath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            JsonFiles.writeAtomically(storePath, songsByGuild, STORE_TYPE);
         } catch (IOException e) {
             System.out.println("[EntrySongRepository] save failed:");
             e.printStackTrace();

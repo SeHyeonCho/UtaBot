@@ -37,15 +37,15 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ### 1. 업로드 채널 기반 mp3 입장곡
 - `/setuploadchannel <채널>`  
-  - 서버별로 **mp3 업로드 전용 텍스트 채널**을 설정
-- 설정된 업로드 채널에 `.mp3` 파일을 올리면:
+  - 서버별로 **mp3 업로드 전용 텍스트 채널**을 설정 (서버 관리 권한 필요, 재시작해도 유지)
+- 설정된 업로드 채널에 `.mp3` 파일을 올리면 (여러 개를 올리면 첫 번째 파일만 사용):
   - 서버 로컬 `uploads/{서버ID}/{유저ID}.mp3` 로 자동 저장
   - 그 서버에서 해당 유저의 입장곡으로 자동 등록
   - 기본 재생 구간: `0초 ~ 10초`
 
 ### 2. 유튜브 URL 기반 입장곡
 - `/setentrysong <url>`  
-  - 유튜브 URL을 그 서버의 **입장곡으로 설정**
+  - 유튜브 URL을 그 서버의 **입장곡으로 설정** (유튜브 외의 링크는 설정할 수 없음)
   - 내부적으로 Lavaplayer의 `youtube-source`를 통해 YouTube URL을 처리하여 재생
   - `music.youtube.com`, `youtu.be` 주소도 처리 가능
   - 기본 재생 구간: `0초 ~ 7초`
@@ -83,7 +83,10 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 - 업로드 채널 정보는 `UploadChannelRepository`(`entrysong.repository.UploadChannelRepository`)에서 서버별로 관리
   - 서버 ID → 업로드 채널 ID 매핑
-  - 메모리 내에서 관리 (재시작 시 초기화)
+  - JSON 파일(`data/upload-channels.json`)에 저장되어 재시작해도 유지
+
+- 저장 파일의 JSON 형식이 잘못되면(직접 고치다 실수한 경우 등) 기존 설정을 덮어쓰지 않도록
+  봇이 시작을 멈추고 어느 파일이 문제인지 알려줍니다.
 
 ### 예전 입장곡 데이터 이전
 예전 버전은 입장곡을 `username#discriminator` 기준으로 모든 서버에 공통으로 저장했습니다
@@ -120,7 +123,9 @@ src/main/java/
 │   │   ├── CommandDispatcher.java     # 서버에 명령어 등록, 이름으로 찾아 실행
 │   │   └── basic/                     # 기본 명령어 (ping, echo)
 │   └── util/
-│       └── CommandUtils.java          # 서버/음성 채널 확인 등 명령어 유틸리티
+│       ├── CommandUtils.java          # 서버/음성 채널 확인 등 명령어 유틸리티
+│       ├── JsonFiles.java             # 설정 JSON 파일 읽기/쓰기
+│       └── UrlUtils.java              # URL, 유튜브 링크 판별
 ├── music/                             # 음악 재생 기능
 │   ├── audio/
 │   │   ├── AudioPlayerManagerFactory.java # LavaPlayer 설정, youtube-source 등록

@@ -3,6 +3,10 @@ package entrysong.repository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -13,14 +17,48 @@ import static org.junit.jupiter.api.Assertions.*;
  * - setUploadChannel(): 서버별 업로드 채널 설정
  * - getUploadChannel(): 서버별 업로드 채널 조회
  * - removeUploadChannel(): 서버별 업로드 채널 제거
+ * - 재시작해도 설정 유지 (JSON 파일 저장)
  */
 class UploadChannelRepositoryTest {
 
+    @TempDir
+    Path tempDir;
+
+    private Path storePath;
     private UploadChannelRepository repository;
 
     @BeforeEach
     void setUp() {
-        repository = new UploadChannelRepository();
+        storePath = tempDir.resolve("data").resolve("upload-channels.json");
+        repository = new UploadChannelRepository(storePath);
+    }
+
+    @Test
+    @DisplayName("설정한 업로드 채널은 다시 생성해도(재시작) 유지된다")
+    void shouldKeepChannelsAfterRestart() {
+        // given
+        repository.setUploadChannel(111L, 999L);
+        repository.setUploadChannel(222L, 888L);
+        repository.removeUploadChannel(222L);
+
+        // when
+        UploadChannelRepository reloaded = new UploadChannelRepository(storePath);
+
+        // then
+        assertEquals(999L, reloaded.getUploadChannel(111L));
+        assertNull(reloaded.getUploadChannel(222L));
+    }
+
+    @Test
+    @DisplayName("저장 파일 형식이 잘못됐으면 덮어쓰지 않도록 시작을 막는다")
+    void shouldRejectBrokenStoreFile() throws Exception {
+        // given
+        Files.createDirectories(storePath.getParent());
+        Files.writeString(storePath, "{ 111: ");
+
+        // when & then
+        assertThrows(IllegalStateException.class, () -> new UploadChannelRepository(storePath));
+        assertEquals("{ 111: ", Files.readString(storePath));
     }
 
     @Test

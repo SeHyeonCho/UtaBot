@@ -43,7 +43,6 @@ bin/
 .idea/**
 .env
 
-gradle/wrapper/gradle-wrapper.jar
 
 uploads/
 data/

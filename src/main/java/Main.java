@@ -46,6 +46,7 @@ public class Main {
     private static final Path LEGACY_ENTRY_SONG_STORE = Path.of("data", "entry-songs.json");
     private static final Path UPLOAD_DIR = Path.of("uploads");
     private static final Path MUSIC_DIR = Path.of("music");
+    private static final Path UPLOAD_CHANNEL_STORE = Path.of("data", "upload-channels.json");
 
     public static void main(String[] args) throws InterruptedException {
         Dotenv dotenv = Dotenv.load();
@@ -57,7 +58,7 @@ public class Main {
         MusicManager musicManager = new MusicManager(AudioPlayerManagerFactory.create());
         EntrySongRepository entrySongRepository = new EntrySongRepository(ENTRY_SONG_STORE);
         EntrySongService entrySongService = new EntrySongService(entrySongRepository, UPLOAD_DIR);
-        UploadChannelRepository uploadChannelRepository = new UploadChannelRepository();
+        UploadChannelRepository uploadChannelRepository = new UploadChannelRepository(UPLOAD_CHANNEL_STORE);
 
         CommandDispatcher commandDispatcher = new CommandDispatcher(List.of(
                 // 기본

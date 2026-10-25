@@ -2,6 +2,7 @@ package entrysong.command;
 
 import common.command.SlashCommand;
 import common.util.CommandUtils;
+import common.util.UrlUtils;
 import entrysong.model.EntrySongConfig;
 import entrysong.service.EntrySongService;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -36,8 +37,10 @@ public class SetEntrySongCommand implements SlashCommand {
 
         String url = event.getOption(OPTION_URL).getAsString();
 
-        if (!EntrySongConfig.isUrl(url)) {
-            event.reply("❌ 유효한 URL을 입력해주세요. (http/https)")
+        // 유튜브 외의 링크는 입장할 때 재생에 실패하므로 설정 단계에서 막음
+        if (!UrlUtils.isYoutubeUrl(url)) {
+            event.reply("❌ 유튜브 링크만 입장곡으로 설정할 수 있어요. (youtube.com, youtu.be)\n" +
+                            "mp3 파일은 업로드 채널에 올려주세요.")
                     .setEphemeral(true).queue();
             return;
         }

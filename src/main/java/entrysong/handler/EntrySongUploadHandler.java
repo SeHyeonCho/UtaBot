@@ -9,6 +9,8 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 /**
  * 서버별로 설정된 업로드 채널에서 .mp3 파일이 올라오면
@@ -36,12 +38,15 @@ public class EntrySongUploadHandler extends ListenerAdapter {
         if (uploadChannelId == null) return;
         if (event.getChannel().getIdLong() != uploadChannelId) return;
 
-        List<Message.Attachment> attachments = event.getMessage().getAttachments();
-        if (attachments.isEmpty()) return;
+        findMp3(event.getMessage().getAttachments())
+                .ifPresent(a -> saveMp3File(event, a));
+    }
 
-        attachments.stream()
-                .filter(a -> a.getFileName().endsWith(".mp3"))
-                .forEach(a -> saveMp3File(event, a));
+    // 한 사람의 입장곡은 파일 하나라서, mp3가 여러 개 올라오면 첫 번째 것만 사용
+    static Optional<Message.Attachment> findMp3(List<Message.Attachment> attachments) {
+        return attachments.stream()
+                .filter(a -> a.getFileName().toLowerCase(Locale.ROOT).endsWith(".mp3"))
+                .findFirst();
     }
 
     private void saveMp3File(MessageReceivedEvent event,

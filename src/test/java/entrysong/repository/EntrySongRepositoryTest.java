@@ -137,6 +137,19 @@ class EntrySongRepositoryTest {
     }
 
     @Test
+    @DisplayName("저장 파일 형식이 잘못됐으면(직접 고치다 실수 등) 덮어쓰지 않도록 시작을 막는다")
+    void shouldRejectBrokenStoreFile() throws Exception {
+        // given
+        Files.createDirectories(storePath.getParent());
+        Files.writeString(storePath, "{ \"111\": { \"1001\": { \"source\": ");
+
+        // when & then
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> new EntrySongRepository(storePath));
+        assertTrue(e.getMessage().contains("server-entry-songs.json"));
+        assertTrue(Files.readString(storePath).startsWith("{ \"111\""));
+    }
+
+    @Test
     @DisplayName("저장 파일이 없으면 빈 상태로 시작한다")
     void shouldStartEmptyWithoutStoreFile() {
         // when

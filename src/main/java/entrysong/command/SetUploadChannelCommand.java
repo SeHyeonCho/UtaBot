@@ -3,9 +3,11 @@ package entrysong.command;
 import common.command.SlashCommand;
 import common.util.CommandUtils;
 import entrysong.repository.UploadChannelRepository;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.DefaultMemberPermissions;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -26,7 +28,9 @@ public class SetUploadChannelCommand implements SlashCommand {
     @Override
     public SlashCommandData data() {
         return Commands.slash("setuploadchannel", "이 서버의 mp3 업로드 채널을 설정합니다.")
-                .addOption(OptionType.CHANNEL, OPTION_CHANNEL, "업로드용 텍스트 채널", true);
+                .addOption(OptionType.CHANNEL, OPTION_CHANNEL, "업로드용 텍스트 채널", true)
+                // 서버 관리 권한이 있는 사람만 사용 (서버 설정의 연동 메뉴에서 바꿀 수 있음)
+                .setDefaultPermissions(DefaultMemberPermissions.enabledFor(Permission.MANAGE_SERVER));
     }
 
     @Override
