@@ -6,9 +6,12 @@ import com.sedmelluq.discord.lavaplayer.tools.FriendlyException;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackEndReason;
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
+import java.util.Random;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -28,6 +31,7 @@ public class TrackScheduler extends AudioEventAdapter {
     private final ScheduledExecutorService executor;
     private final Queue<AudioTrack> queue = new LinkedList<>();
     private volatile List<AudioTrack> queueSnapshot = List.of();
+    private volatile RepeatMode repeatMode = RepeatMode.OFF;
 
     private AudioTrack entryTrack;        // 지금 끼어들어 재생 중인 입장곡
     private AudioTrack resumeTrack;       // 입장곡이 끝나면 이어서 재생할 원래 곡
@@ -59,16 +63,47 @@ public class TrackScheduler extends AudioEventAdapter {
      * 현재 곡을 건너뛰는 메소드 입니다.
      *
      * 입장곡 재생 중이면 입장곡만 끝내고 원래 곡으로 돌아갑니다.
+     * 전체 반복 중이면 건너뛴 곡은 대기열 맨 뒤로 갑니다.
      */
     public void skip() {
         run(() -> {
             if (entryTrack != null) {
                 finishEntrySong(entryTrack);
-            } else {
-                playNextFromQueue();
-                publishQueue();
+                return;
             }
+
+            AudioTrack current = player.getPlayingTrack();
+            if (repeatMode == RepeatMode.QUEUE && current != null) {
+                queue.offer(current.makeClone());
+            }
+            playNextFromQueue();
+            publishQueue();
         });
+    }
+
+    /**
+     * 대기열 순서를 무작위로 섞는 메소드 입니다. 지금 재생 중인 곡은 그대로 둡니다.
+     */
+    public void shuffle() {
+        shuffle(new Random());
+    }
+
+    void shuffle(Random random) {
+        run(() -> {
+            List<AudioTrack> tracks = new ArrayList<>(queue);
+            Collections.shuffle(tracks, random);
+            queue.clear();
+            queue.addAll(tracks);
+            publishQueue();
+        });
+    }
+
+    public void setRepeatMode(RepeatMode repeatMode) {
+        this.repeatMode = repeatMode;
+    }
+
+    public RepeatMode getRepeatMode() {
+        return repeatMode;
     }
 
     /**
@@ -79,6 +114,7 @@ public class TrackScheduler extends AudioEventAdapter {
             queue.clear();
             clearEntrySong();
             player.stopTrack();
+            player.setPaused(false); // 다음에 재생할 곡이 일시정지 상태로 시작하지 않게
             publishQueue();
         });
     }
@@ -161,10 +197,22 @@ public class TrackScheduler extends AudioEventAdapter {
         }
 
         // 그 사이에 다른 곡이 이미 시작됐으면(입장곡 복귀, 새로 추가된 곡 등) 건드리지 않음
-        if (endReason.mayStartNext && player.getPlayingTrack() == null) {
-            playNextFromQueue();
-            publishQueue();
+        if (!endReason.mayStartNext || player.getPlayingTrack() != null) {
+            return;
         }
+
+        // 끝까지 재생된 곡만 반복 (재생에 실패한 곡을 반복하면 같은 오류가 계속 남)
+        if (endReason == AudioTrackEndReason.FINISHED) {
+            if (repeatMode == RepeatMode.TRACK) {
+                player.startTrack(track.makeClone(), false);
+                return;
+            }
+            if (repeatMode == RepeatMode.QUEUE) {
+                queue.offer(track.makeClone());
+            }
+        }
+        playNextFromQueue();
+        publishQueue();
     }
 
     private void finishEntrySong(AudioTrack track) {

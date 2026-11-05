@@ -26,7 +26,7 @@ public class SkipCommand implements SlashCommand {
             return;
         }
 
-        musicManager.of(event.getGuild()).skip();
-        event.reply("⏭ 다음 트랙으로 넘어갑니다.").queue();
+        MusicControls.Reply reply = MusicControls.skip(musicManager.of(event.getGuild()));
+        event.reply(reply.message()).setEphemeral(reply.ephemeral()).queue();
     }
 }

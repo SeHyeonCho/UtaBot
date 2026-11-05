@@ -16,6 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -291,6 +292,111 @@ class TrackSchedulerTest {
         // when & then
         assertDoesNotThrow(() -> scheduler.onTrackException(player, entryTrack,
                 new FriendlyException("failed", FriendlyException.Severity.COMMON, null)));
+    }
+
+    // ─────────────────────────────
+    // 반복 / 섞기
+    // ─────────────────────────────
+
+    @Test
+    @DisplayName("한 곡 반복이면 끝난 곡을 처음부터 다시 재생한다")
+    void shouldReplayTrackWhenRepeatingTrack() {
+        // given
+        AudioTrack replay = mock(AudioTrack.class);
+        when(track1.makeClone()).thenReturn(replay);
+        scheduler.setRepeatMode(RepeatMode.TRACK);
+
+        // when
+        scheduler.onTrackEnd(player, track1, AudioTrackEndReason.FINISHED);
+
+        // then
+        verify(player).startTrack(replay, false);
+    }
+
+    @Test
+    @DisplayName("재생에 실패한 곡은 반복하지 않고 다음 곡으로 넘어간다")
+    void shouldNotRepeatFailedTrack() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        scheduler.queue(track2);
+        when(player.getPlayingTrack()).thenReturn(null);
+        scheduler.setRepeatMode(RepeatMode.TRACK);
+
+        // when
+        scheduler.onTrackEnd(player, track1, AudioTrackEndReason.LOAD_FAILED);
+
+        // then
+        verify(track1, never()).makeClone();
+        verify(player).startTrack(track2, false);
+    }
+
+    @Test
+    @DisplayName("전체 반복이면 끝난 곡을 대기열 맨 뒤에 다시 넣는다")
+    void shouldRequeueFinishedTrackWhenRepeatingQueue() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        scheduler.queue(track2);
+        when(player.getPlayingTrack()).thenReturn(null);
+        AudioTrack requeued = mock(AudioTrack.class);
+        when(track1.makeClone()).thenReturn(requeued);
+        scheduler.setRepeatMode(RepeatMode.QUEUE);
+
+        // when
+        scheduler.onTrackEnd(player, track1, AudioTrackEndReason.FINISHED);
+
+        // then
+        verify(player).startTrack(track2, false);
+        assertEquals(List.of(requeued), scheduler.getQueue());
+    }
+
+    @Test
+    @DisplayName("전체 반복 중 넘기면 넘긴 곡이 대기열 맨 뒤로 간다")
+    void shouldRequeueSkippedTrackWhenRepeatingQueue() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        when(originalTrack.makeClone()).thenReturn(originalClone);
+        scheduler.queue(track1);
+        scheduler.setRepeatMode(RepeatMode.QUEUE);
+
+        // when
+        scheduler.skip();
+
+        // then
+        verify(player).startTrack(track1, false);
+        assertEquals(List.of(originalClone), scheduler.getQueue());
+    }
+
+    @Test
+    @DisplayName("대기열을 섞으면 곡 순서만 바뀐다")
+    void shouldShuffleQueueOrder() {
+        // given
+        when(player.getPlayingTrack()).thenReturn(originalTrack);
+        scheduler.queue(track1);
+        scheduler.queue(track2);
+        scheduler.queue(entryTrack);
+        Random alwaysFirst = new Random() {
+            @Override
+            public int nextInt(int bound) {
+                return 0;
+            }
+        };
+
+        // when
+        scheduler.shuffle(alwaysFirst);
+
+        // then: [1, 2, 3] → Collections.shuffle(항상 0번과 교환) → [2, 3, 1]
+        assertEquals(List.of(track2, entryTrack, track1), scheduler.getQueue());
+        verify(player, never()).startTrack(any(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("정지하면 일시정지도 풀어서 다음 곡이 멈춘 채로 시작하지 않는다")
+    void shouldUnpauseOnStop() {
+        // when
+        scheduler.stop();
+
+        // then
+        verify(player).setPaused(false);
     }
 
     // ─────────────────────────────

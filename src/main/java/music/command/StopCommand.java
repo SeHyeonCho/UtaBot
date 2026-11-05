@@ -3,7 +3,6 @@ package music.command;
 import common.command.SlashCommand;
 import common.util.CommandUtils;
 import music.service.MusicManager;
-import music.service.ServerMusicManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.interactions.commands.build.SlashCommandData;
@@ -27,11 +26,7 @@ public class StopCommand implements SlashCommand {
             return;
         }
 
-        ServerMusicManager music = musicManager.of(event.getGuild());
-        music.stop();
-        if (music.isConnected()) {
-            music.disconnect();
-        }
-        event.reply("⏹ 정지하고 연결을 종료했어요.").queue();
+        MusicControls.Reply reply = MusicControls.stop(musicManager.of(event.getGuild()));
+        event.reply(reply.message()).setEphemeral(reply.ephemeral()).queue();
     }
 }

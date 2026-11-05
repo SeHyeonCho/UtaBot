@@ -22,12 +22,28 @@ Slash Command 기반으로 명령어를 수행합니다.
 - `/stop` — 재생 중지 + 대기열 초기화
 - `/queue` — 현재 대기열 표시
 - `/volume [level]` — 볼륨 조절 (0~150, 비우면 현재 볼륨 표시)
+- `/nowplaying` — 지금 재생 중인 곡, 진행 바, 반복 모드 표시 + 조작 버튼
+  - ⏯ 일시정지 · ⏭ 다음 곡 · 🔁 반복 · 🔀 섞기 · ⏹ 정지 (슬래시 명령어 없이 버튼으로 조작)
+- `/pause` — 일시정지, 다시 쓰면 이어서 재생
+- `/loop [mode]` — 반복 끄기 / 한 곡 반복 / 전체 반복 (비우면 순서대로 바뀜)
+- `/shuffle` — 대기열 순서를 무작위로 섞기
+
+---
+
+## 놀이 기능
+- `/dice [sides] [count]` — 주사위 굴리기 (기본 6면 1개, 최대 1000면 10개)
+- `/pick <선택지>` — 쉼표로 구분한 선택지 중 하나 골라주기 (예: `/pick 짜장면, 짬뽕, 탕수육`)
+- `/ladder <참가자> [결과]` — 사다리 타기 (결과를 비우면 한 명만 당첨, 나머지는 꽝)
+  - 예: `/ladder participants:철수, 영희, 민수 results:커피 사기, 꽝, 꽝`
+- `/conch <질문>` — 마법의 소라고둥님께 물어보기
+
+※ 봇이 입력을 그대로 보여주는 명령어가 있어서, 봇을 통한 `@everyone`·`@here`·역할 멘션은 막아두었습니다.
 
 ---
 
 ## 대기열 관리 
 - 여러 트랙 대기열 추가 가능
-- 현재 곡이 끝나면 자동으로 다음 곡 재생
+- 현재 곡이 끝나면 자동으로 다음 곡 재생 (`/loop`로 한 곡 반복, 전체 반복 가능)
 
 ---
 
@@ -130,11 +146,17 @@ src/main/java/
 │   ├── audio/
 │   │   ├── AudioPlayerManagerFactory.java # LavaPlayer 설정, youtube-source 등록
 │   │   └── AudioPlayerSendHandler.java    # LavaPlayer 오디오를 Discord로 전송
-│   ├── command/                       # join, leave, play, skip, stop, queue, volume
+│   ├── command/                       # join, leave, play, skip, stop, queue, volume,
+│   │                                  # nowplaying, pause, loop, shuffle (+ MusicControls: 버튼과 공용 조작)
+│   ├── handler/
+│   │   └── MusicButtonHandler.java    # /nowplaying 조작 버튼 처리
 │   └── service/
 │       ├── MusicManager.java          # 서버별 음악 매니저 관리
+│       ├── RepeatMode.java            # 반복 방식 (끔, 한 곡, 전체)
 │       ├── ServerMusicManager.java    # 서버별 재생 제어 + 음성 연결
-│       └── TrackScheduler.java        # 트랙 대기열, 입장곡 끼워넣기
+│       └── TrackScheduler.java        # 트랙 대기열, 반복, 섞기, 입장곡 끼워넣기
+├── fun/                               # 놀이 기능
+│   └── command/                       # dice, pick, ladder, conch
 └── entrysong/                         # 입장곡 기능
     ├── command/                       # setentrysong, setentrytime, setuploadchannel
     ├── handler/
@@ -166,20 +188,6 @@ src/main/java/
 ---
 
 # 추가 예정 기능
-
-## Loop & Playback 기능
-- `/loop` — 현재 트랙 반복
-- `/loopqueue` — 전체 대기열 반복
-- `/shuffle` — 대기열 랜덤 섞기  
-
----
-
-## 반응형 UI 기능 
-- 메시지에 음악 제어 버튼 표시  
-  (⏯, ⏭, ⏹, 🔀, 🔁 등)
-- Slash 없이도 조작 가능한 UI
-
----
 
 ## 가사(Lyrics) 출력
 - `/lyrics` → 현재 재생 트랙의 가사 자동 검색

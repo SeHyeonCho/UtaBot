@@ -2,6 +2,10 @@ import common.command.CommandDispatcher;
 import common.command.basic.EchoCommand;
 import common.command.basic.PingCommand;
 import entrysong.command.SetEntrySongCommand;
+import fun.command.ConchCommand;
+import fun.command.DiceCommand;
+import fun.command.LadderCommand;
+import fun.command.PickCommand;
 import entrysong.command.SetEntryTimeCommand;
 import entrysong.command.SetUploadChannelCommand;
 import entrysong.handler.EntrySongJoinHandler;
@@ -14,11 +18,16 @@ import entrysong.service.LegacyEntrySongMigration.GuildMember;
 import music.audio.AudioPlayerManagerFactory;
 import music.command.JoinCommand;
 import music.command.LeaveCommand;
+import music.command.LoopCommand;
+import music.command.NowPlayingCommand;
+import music.command.PauseCommand;
 import music.command.PlayCommand;
 import music.command.QueueCommand;
+import music.command.ShuffleCommand;
 import music.command.SkipCommand;
 import music.command.StopCommand;
 import music.command.VolumeCommand;
+import music.handler.MusicButtonHandler;
 import music.service.MusicManager;
 import io.github.cdimascio.dotenv.Dotenv;
 import moe.kyokobot.libdave.NativeDaveFactory;
@@ -28,11 +37,14 @@ import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.utils.messages.MessageRequest;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -55,6 +67,10 @@ public class Main {
         // DAVE 네이티브 라이브러리를 이 OS에서 쓸 수 있는지 먼저 확인 (없으면 음성 연결이 전부 실패함)
         NativeDaveFactory.ensureAvailable();
 
+        // /echo, /pick 등은 입력을 그대로 보여주므로 봇을 통한 @everyone, @here, 역할 멘션은 막음
+        MessageRequest.setDefaultMentions(EnumSet.complementOf(EnumSet.of(
+                Message.MentionType.EVERYONE, Message.MentionType.HERE, Message.MentionType.ROLE)));
+
         MusicManager musicManager = new MusicManager(AudioPlayerManagerFactory.create());
         EntrySongRepository entrySongRepository = new EntrySongRepository(ENTRY_SONG_STORE);
         EntrySongService entrySongService = new EntrySongService(entrySongRepository, UPLOAD_DIR);
@@ -73,10 +89,19 @@ public class Main {
                 new StopCommand(musicManager),
                 new QueueCommand(musicManager),
                 new VolumeCommand(musicManager),
+                new NowPlayingCommand(musicManager),
+                new PauseCommand(musicManager),
+                new LoopCommand(musicManager),
+                new ShuffleCommand(musicManager),
                 // 입장곡
                 new SetEntryTimeCommand(entrySongService),
                 new SetUploadChannelCommand(uploadChannelRepository),
-                new SetEntrySongCommand(entrySongService)
+                new SetEntrySongCommand(entrySongService),
+                // 놀이
+                new DiceCommand(),
+                new PickCommand(),
+                new LadderCommand(),
+                new ConchCommand()
         ));
 
         JDA jda = JDABuilder.create(
@@ -91,6 +116,7 @@ public class Main {
                         .withDaveSessionFactory(new LDJDADaveSessionFactory(new NativeDaveFactory())))
                 .addEventListeners(
                         commandDispatcher,
+                        new MusicButtonHandler(musicManager),
                         new EntrySongJoinHandler(entrySongService, musicManager),
                         new EntrySongUploadHandler(uploadChannelRepository, entrySongService)
                 )

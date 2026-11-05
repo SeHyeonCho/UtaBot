@@ -104,6 +104,33 @@ public class ServerMusicManager {
         return player.getPlayingTrack() != null;
     }
 
+    /**
+     * @return 지금 재생 중인 곡 (입장곡 재생 중이면 입장곡), 없으면 null
+     */
+    public AudioTrack getPlayingTrack() {
+        return player.getPlayingTrack();
+    }
+
+    public boolean isPaused() {
+        return player.isPaused();
+    }
+
+    public void setPaused(boolean paused) {
+        player.setPaused(paused);
+    }
+
+    public void shuffle() {
+        scheduler.shuffle();
+    }
+
+    public RepeatMode getRepeatMode() {
+        return scheduler.getRepeatMode();
+    }
+
+    public void setRepeatMode(RepeatMode repeatMode) {
+        scheduler.setRepeatMode(repeatMode);
+    }
+
     public int getVolume() {
         return player.getVolume();
     }
