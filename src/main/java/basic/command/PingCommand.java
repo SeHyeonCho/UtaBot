@@ -1,4 +1,4 @@
-package common.command.basic;
+package basic.command;
 
 import common.command.SlashCommand;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;

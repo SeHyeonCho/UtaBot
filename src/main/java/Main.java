@@ -1,68 +1,32 @@
-import common.command.CommandDispatcher;
-import common.command.basic.EchoCommand;
-import common.command.basic.PingCommand;
-import entrysong.command.SetEntrySongCommand;
-import fun.command.ConchCommand;
-import fun.command.DiceCommand;
-import fun.command.LadderCommand;
-import fun.command.PickCommand;
-import entrysong.command.SetEntryTimeCommand;
-import entrysong.command.SetUploadChannelCommand;
-import entrysong.handler.EntrySongJoinHandler;
-import entrysong.handler.EntrySongUploadHandler;
-import entrysong.repository.EntrySongRepository;
-import entrysong.repository.UploadChannelRepository;
-import entrysong.service.EntrySongService;
-import entrysong.service.LegacyEntrySongMigration;
-import entrysong.service.LegacyEntrySongMigration.GuildMember;
-import music.audio.AudioPlayerManagerFactory;
-import music.command.JoinCommand;
-import music.command.LeaveCommand;
-import music.command.LoopCommand;
-import music.command.NowPlayingCommand;
-import music.command.PauseCommand;
-import music.command.PlayCommand;
-import music.command.QueueCommand;
-import music.command.ShuffleCommand;
-import music.command.SkipCommand;
-import music.command.StopCommand;
-import music.command.VolumeCommand;
-import music.handler.MusicButtonHandler;
-import music.service.MusicManager;
+import basic.BasicModule;
+import common.config.BotConfig;
+import common.module.BotModule;
+import common.module.BotModules;
+import entrysong.EntrySongModule;
+import fun.FunModule;
 import io.github.cdimascio.dotenv.Dotenv;
 import moe.kyokobot.libdave.NativeDaveFactory;
 import moe.kyokobot.libdave.jda.LDJDADaveSessionFactory;
-import net.dv8tion.jda.api.audio.AudioModuleConfig;
+import music.MusicModule;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
-import net.dv8tion.jda.api.entities.Guild;
-import net.dv8tion.jda.api.entities.Member;
+import net.dv8tion.jda.api.audio.AudioModuleConfig;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.messages.MessageRequest;
 
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 
 /**
  * 봇 진입점입니다.
  *
- * 봇에서 쓰는 객체는 모두 여기서 만들고 필요한 곳에 생성자로 넘겨줍니다.
+ * 기능은 BotModule 단위로 나뉘어 있고, createModules()의 목록에 있는 기능만 봇에 들어갑니다.
  */
 public class Main {
 
-    private static final Path ENTRY_SONG_STORE = Path.of("data", "server-entry-songs.json");
-    private static final Path LEGACY_ENTRY_SONG_STORE = Path.of("data", "entry-songs.json");
-    private static final Path UPLOAD_DIR = Path.of("uploads");
-    private static final Path MUSIC_DIR = Path.of("music");
-    private static final Path UPLOAD_CHANNEL_STORE = Path.of("data", "upload-channels.json");
-
     public static void main(String[] args) throws InterruptedException {
-        Dotenv dotenv = Dotenv.load();
-        String token = dotenv.get("TOKEN");
+        // .env 파일이 없으면 환경 변수에서 읽음
+        BotConfig config = BotConfig.load(Dotenv.configure().ignoreIfMissing().load());
 
         // DAVE 네이티브 라이브러리를 이 OS에서 쓸 수 있는지 먼저 확인 (없으면 음성 연결이 전부 실패함)
         NativeDaveFactory.ensureAvailable();
@@ -71,89 +35,32 @@ public class Main {
         MessageRequest.setDefaultMentions(EnumSet.complementOf(EnumSet.of(
                 Message.MentionType.EVERYONE, Message.MentionType.HERE, Message.MentionType.ROLE)));
 
-        MusicManager musicManager = new MusicManager(AudioPlayerManagerFactory.create());
-        EntrySongRepository entrySongRepository = new EntrySongRepository(ENTRY_SONG_STORE);
-        EntrySongService entrySongService = new EntrySongService(entrySongRepository, UPLOAD_DIR);
-        UploadChannelRepository uploadChannelRepository = new UploadChannelRepository(UPLOAD_CHANNEL_STORE);
+        BotModules modules = new BotModules(createModules(config));
 
-        CommandDispatcher commandDispatcher = new CommandDispatcher(List.of(
-                // 기본
-                new PingCommand(),
-                new EchoCommand(),
-                // 보이스 채널
-                new JoinCommand(musicManager),
-                new LeaveCommand(musicManager),
-                // 음악
-                new PlayCommand(musicManager, MUSIC_DIR),
-                new SkipCommand(musicManager),
-                new StopCommand(musicManager),
-                new QueueCommand(musicManager),
-                new VolumeCommand(musicManager),
-                new NowPlayingCommand(musicManager),
-                new PauseCommand(musicManager),
-                new LoopCommand(musicManager),
-                new ShuffleCommand(musicManager),
-                // 입장곡
-                new SetEntryTimeCommand(entrySongService),
-                new SetUploadChannelCommand(uploadChannelRepository),
-                new SetEntrySongCommand(entrySongService),
-                // 놀이
-                new DiceCommand(),
-                new PickCommand(),
-                new LadderCommand(),
-                new ConchCommand()
-        ));
-
-        JDA jda = JDABuilder.create(
-                        token,
-                        GatewayIntent.GUILD_MESSAGES,
-                        GatewayIntent.GUILD_MEMBERS,
-                        GatewayIntent.MESSAGE_CONTENT,
-                        GatewayIntent.GUILD_VOICE_STATES
-                )
+        JDA jda = JDABuilder.create(config.token(), modules.intents())
                 // 2026년 3월부터 디스코드 음성은 종단간 암호화(DAVE)를 지원해야만 연결됨
                 .setAudioModuleConfig(new AudioModuleConfig()
                         .withDaveSessionFactory(new LDJDADaveSessionFactory(new NativeDaveFactory())))
-                .addEventListeners(
-                        commandDispatcher,
-                        new MusicButtonHandler(musicManager),
-                        new EntrySongJoinHandler(entrySongService, musicManager),
-                        new EntrySongUploadHandler(uploadChannelRepository, entrySongService)
-                )
+                .addEventListeners(modules.eventListeners().toArray())
                 .build();
 
         jda.awaitReady();
         System.out.println("로그인 성공 ~!" + jda.getSelfUser().getAsTag());
 
-        migrateLegacyEntrySongs(jda, entrySongService, entrySongRepository);
+        modules.onReady(jda);
     }
 
-    // 예전 입장곡 데이터(username#discriminator 기준)가 남아 있으면 서버별·userId 기준으로 옮김
-    private static void migrateLegacyEntrySongs(JDA jda,
-                                                EntrySongService entrySongService,
-                                                EntrySongRepository entrySongRepository) {
-        LegacyEntrySongMigration migration = new LegacyEntrySongMigration(
-                entrySongService, entrySongRepository, LEGACY_ENTRY_SONG_STORE, UPLOAD_DIR);
+    /**
+     * 봇에 들어가는 기능 목록입니다. 새 기능은 BotModule을 만들어 여기에 추가하면 됩니다.
+     */
+    static List<BotModule> createModules(BotConfig config) {
+        MusicModule music = new MusicModule(config);
 
-        try {
-            if (!migration.hasLegacyData()) {
-                return;
-            }
-
-            List<GuildMember> members = new ArrayList<>();
-            for (Guild guild : jda.getGuilds()) {
-                for (Member member : guild.getMembers()) {
-                    if (member.getUser().isBot()) {
-                        continue;
-                    }
-                    members.add(new GuildMember(guild.getIdLong(), member.getIdLong(),
-                            member.getUser().getName(), member.getUser().getDiscriminator()));
-                }
-            }
-            migration.migrate(members);
-        } catch (IOException e) {
-            System.out.println("[EntrySongMigration] failed:");
-            e.printStackTrace();
-        }
+        return List.of(
+                new BasicModule(),
+                music,
+                new EntrySongModule(config, music.musicManager()),
+                new FunModule()
+        );
     }
 }

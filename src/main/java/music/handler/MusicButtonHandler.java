@@ -1,16 +1,16 @@
 package music.handler;
 
+import common.command.ButtonHandler;
 import music.command.MusicControls;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
-import net.dv8tion.jda.api.hooks.ListenerAdapter;
 
 /**
  * /nowplaying 메시지의 조작 버튼(⏯ ⏭ 🔁 🔀 ⏹)을 처리하는 핸들러입니다.
  */
-public class MusicButtonHandler extends ListenerAdapter {
+public class MusicButtonHandler implements ButtonHandler {
 
     private final MusicManager musicManager;
 
@@ -19,14 +19,14 @@ public class MusicButtonHandler extends ListenerAdapter {
     }
 
     @Override
-    public void onButtonInteraction(ButtonInteractionEvent event) {
-        String id = event.getComponentId();
-        if (!id.startsWith(MusicControls.BUTTON_PREFIX) || event.getGuild() == null) {
-            return;
-        }
+    public String idPrefix() {
+        return MusicControls.ID_PREFIX;
+    }
 
+    @Override
+    public void handle(ButtonInteractionEvent event) {
         ServerMusicManager music = musicManager.of(event.getGuild());
-        MusicControls.Reply reply = switch (id) {
+        MusicControls.Reply reply = switch (event.getComponentId()) {
             case MusicControls.PAUSE -> MusicControls.togglePause(music);
             case MusicControls.SKIP -> MusicControls.skip(music);
             case MusicControls.LOOP -> MusicControls.cycleRepeat(music);

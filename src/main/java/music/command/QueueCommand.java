@@ -2,7 +2,6 @@ package music.command;
 
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import music.service.MusicManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -27,10 +26,6 @@ public class QueueCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         List<AudioTrack> queue = musicManager.of(event.getGuild()).getQueue();
         if (queue.isEmpty()) {
             event.reply("대기열이 비었어요.").setEphemeral(true).queue();

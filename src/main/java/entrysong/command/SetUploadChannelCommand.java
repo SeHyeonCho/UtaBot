@@ -1,7 +1,6 @@
 package entrysong.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import entrysong.repository.UploadChannelRepository;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
@@ -35,10 +34,6 @@ public class SetUploadChannelCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         GuildChannel channel = event.getOption(OPTION_CHANNEL).getAsChannel();
 
         if (!(channel instanceof GuildMessageChannel messageChannel)) {

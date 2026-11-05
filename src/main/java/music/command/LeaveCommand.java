@@ -1,7 +1,6 @@
 package music.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -23,10 +22,6 @@ public class LeaveCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         ServerMusicManager music = musicManager.of(event.getGuild());
         if (music.isConnected()) {
             music.disconnect();

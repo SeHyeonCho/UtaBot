@@ -1,5 +1,6 @@
 package music.command;
 
+import common.command.ButtonHandler;
 import music.service.RepeatMode;
 import music.service.ServerMusicManager;
 import net.dv8tion.jda.api.components.actionrow.ActionRow;
@@ -10,12 +11,13 @@ import net.dv8tion.jda.api.components.buttons.Button;
  */
 public final class MusicControls {
 
-    public static final String BUTTON_PREFIX = "music:";
-    public static final String PAUSE = BUTTON_PREFIX + "pause";
-    public static final String SKIP = BUTTON_PREFIX + "skip";
-    public static final String LOOP = BUTTON_PREFIX + "loop";
-    public static final String SHUFFLE = BUTTON_PREFIX + "shuffle";
-    public static final String STOP = BUTTON_PREFIX + "stop";
+    // 버튼 ID: "music:동작"
+    public static final String ID_PREFIX = "music";
+    public static final String PAUSE = ID_PREFIX + ButtonHandler.ID_SEPARATOR + "pause";
+    public static final String SKIP = ID_PREFIX + ButtonHandler.ID_SEPARATOR + "skip";
+    public static final String LOOP = ID_PREFIX + ButtonHandler.ID_SEPARATOR + "loop";
+    public static final String SHUFFLE = ID_PREFIX + ButtonHandler.ID_SEPARATOR + "shuffle";
+    public static final String STOP = ID_PREFIX + ButtonHandler.ID_SEPARATOR + "stop";
 
     private static final String NOTHING_PLAYING = "지금 재생 중인 곡이 없어요.";
 

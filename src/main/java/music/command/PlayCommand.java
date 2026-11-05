@@ -44,10 +44,6 @@ public class PlayCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         AudioChannel channel = CommandUtils.requireVoiceChannel(event);
         if (channel == null) {
             return;

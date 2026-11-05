@@ -1,7 +1,6 @@
 package entrysong.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import entrysong.model.EntrySongConfig;
 import entrysong.service.EntrySongService;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -32,10 +31,6 @@ public class SetEntryTimeCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         int start = event.getOption(OPTION_START).getAsInt();
         int duration = event.getOption(OPTION_DURATION).getAsInt();
 

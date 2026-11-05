@@ -3,7 +3,6 @@ package music.command;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrack;
 import com.sedmelluq.discord.lavaplayer.track.AudioTrackInfo;
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import music.service.MusicManager;
 import music.service.ServerMusicManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -30,10 +29,6 @@ public class NowPlayingCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         String text = format(musicManager.of(event.getGuild()));
         if (text == null) {
             event.reply("지금 재생 중인 곡이 없어요.").setEphemeral(true).queue();

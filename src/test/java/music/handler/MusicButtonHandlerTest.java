@@ -16,7 +16,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -64,13 +64,19 @@ class MusicButtonHandlerTest {
     }
 
     @Test
+    @DisplayName("music으로 시작하는 버튼을 맡는다")
+    void shouldHandleMusicPrefix() {
+        assertEquals("music", handler.idPrefix());
+    }
+
+    @Test
     @DisplayName("다음 곡 버튼을 누르면 넘기고 누가 눌렀는지 알린다")
     void shouldSkipOnSkipButton() {
         // given
         when(event.getComponentId()).thenReturn(MusicControls.SKIP);
 
         // when
-        handler.onButtonInteraction(event);
+        handler.handle(event);
 
         // then
         verify(music).skip();
@@ -85,7 +91,7 @@ class MusicButtonHandlerTest {
         when(event.getComponentId()).thenReturn(MusicControls.PAUSE);
 
         // when
-        handler.onButtonInteraction(event);
+        handler.handle(event);
 
         // then
         verify(event).reply("지금 재생 중인 곡이 없어요.");
@@ -93,16 +99,15 @@ class MusicButtonHandlerTest {
     }
 
     @Test
-    @DisplayName("다른 기능의 버튼은 무시한다")
-    void shouldIgnoreOtherButtons() {
+    @DisplayName("모르는 동작의 버튼은 무시한다")
+    void shouldIgnoreUnknownAction() {
         // given
-        when(event.getComponentId()).thenReturn("poll:yes");
+        when(event.getComponentId()).thenReturn("music:unknown");
 
         // when
-        handler.onButtonInteraction(event);
+        handler.handle(event);
 
         // then
-        verify(musicManager, never()).of(any());
         verify(event, never()).reply(anyString());
     }
 }

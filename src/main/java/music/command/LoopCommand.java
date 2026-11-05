@@ -1,7 +1,6 @@
 package music.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import music.service.MusicManager;
 import music.service.RepeatMode;
 import music.service.ServerMusicManager;
@@ -38,10 +37,6 @@ public class LoopCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         ServerMusicManager music = musicManager.of(event.getGuild());
         OptionMapping option = event.getOption(OPTION_MODE);
         MusicControls.Reply reply = option == null

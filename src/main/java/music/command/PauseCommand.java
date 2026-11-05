@@ -1,7 +1,6 @@
 package music.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import music.service.MusicManager;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -25,10 +24,6 @@ public class PauseCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         MusicControls.Reply reply = MusicControls.togglePause(musicManager.of(event.getGuild()));
         event.reply(reply.message()).setEphemeral(reply.ephemeral()).queue();
     }

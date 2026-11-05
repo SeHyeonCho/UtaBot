@@ -23,10 +23,6 @@ public class JoinCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         AudioChannel userChannel = CommandUtils.requireVoiceChannel(event);
         if (userChannel == null) {
             return;

@@ -1,7 +1,6 @@
 package entrysong.command;
 
 import common.command.SlashCommand;
-import common.util.CommandUtils;
 import common.util.UrlUtils;
 import entrysong.model.EntrySongConfig;
 import entrysong.service.EntrySongService;
@@ -31,10 +30,6 @@ public class SetEntrySongCommand implements SlashCommand {
 
     @Override
     public void execute(SlashCommandInteractionEvent event) {
-        if (!CommandUtils.requireGuild(event)) {
-            return;
-        }
-
         String url = event.getOption(OPTION_URL).getAsString();
 
         // 유튜브 외의 링크는 입장할 때 재생에 실패하므로 설정 단계에서 막음

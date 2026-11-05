@@ -119,7 +119,17 @@ Slash Command 기반으로 명령어를 수행합니다.
 ## 실행 환경
 
 - Java 17 이상
-- `.env` 파일에 `TOKEN=디스코드 봇 토큰`
+- 설정은 `.env` 파일이나 환경 변수로 합니다.
+
+  | 이름 | 필수 | 기본값 | 설명 |
+  |---|---|---|---|
+  | `TOKEN` | O | | 디스코드 봇 토큰 |
+  | `DATA_DIR` | | `data` | 설정 JSON 파일 폴더 |
+  | `UPLOAD_DIR` | | `uploads` | 업로드한 입장곡 mp3 폴더 |
+  | `MUSIC_DIR` | | `music` | `/play 파일이름`으로 재생할 음악 폴더 |
+
+- 디스코드 개발자 포털에서 봇의 **Server Members Intent**와 **Message Content Intent**를 켜야 합니다
+  (입장곡 업로드 채널, 예전 데이터 이전에 사용).
 - 디스코드는 2026년 3월부터 음성 채널에 종단간 암호화(DAVE)를 요구합니다.
   봇은 [libdave-jvm](https://github.com/KyokoBot/libdave-jvm)으로 이를 지원하며, 아래 OS에서 동작합니다.
   - Linux (x86-64, aarch64), Windows (x86-64), macOS
@@ -132,17 +142,26 @@ Slash Command 기반으로 명령어를 수행합니다.
 
 ```
 src/main/java/
-├── Main.java                          # 봇 진입점 (객체 생성/연결, 예전 데이터 이전)
-├── common/                            # 공통 기능
+├── Main.java                          # 봇 진입점. createModules()에 들어갈 기능 목록이 있음
+├── common/                            # 여러 기능이 같이 쓰는 기반 코드
 │   ├── command/
-│   │   ├── SlashCommand.java          # 명령어 정의 + 처리 인터페이스
-│   │   ├── CommandDispatcher.java     # 서버에 명령어 등록, 이름으로 찾아 실행
-│   │   └── basic/                     # 기본 명령어 (ping, echo)
+│   │   ├── SlashCommand.java          # 슬래시 명령어 하나 (정의 + 처리)
+│   │   ├── ButtonHandler.java         # 한 기능의 버튼들 ("앞부분:동작" ID)
+│   │   └── InteractionDispatcher.java # 명령어/버튼을 알맞은 곳으로 보내고, 서버에 명령어 등록
+│   ├── module/
+│   │   ├── BotModule.java             # 기능 하나 (명령어, 버튼, 리스너, Intent, 시작 시 작업)
+│   │   └── BotModules.java            # 모든 기능을 모아 JDA에 등록할 형태로 만듦
+│   ├── config/
+│   │   └── BotConfig.java             # .env / 환경 변수 설정
 │   └── util/
 │       ├── CommandUtils.java          # 서버/음성 채널 확인 등 명령어 유틸리티
 │       ├── JsonFiles.java             # 설정 JSON 파일 읽기/쓰기
 │       └── UrlUtils.java              # URL, 유튜브 링크 판별
+├── basic/                             # 기본 기능
+│   ├── BasicModule.java
+│   └── command/                       # ping, echo
 ├── music/                             # 음악 재생 기능
+│   ├── MusicModule.java               # 다른 기능에 musicManager()를 넘겨줄 수 있음
 │   ├── audio/
 │   │   ├── AudioPlayerManagerFactory.java # LavaPlayer 설정, youtube-source 등록
 │   │   └── AudioPlayerSendHandler.java    # LavaPlayer 오디오를 Discord로 전송
@@ -155,27 +174,63 @@ src/main/java/
 │       ├── RepeatMode.java            # 반복 방식 (끔, 한 곡, 전체)
 │       ├── ServerMusicManager.java    # 서버별 재생 제어 + 음성 연결
 │       └── TrackScheduler.java        # 트랙 대기열, 반복, 섞기, 입장곡 끼워넣기
-├── fun/                               # 놀이 기능
-│   └── command/                       # dice, pick, ladder, conch
-└── entrysong/                         # 입장곡 기능
-    ├── command/                       # setentrysong, setentrytime, setuploadchannel
-    ├── handler/
-    │   ├── EntrySongJoinHandler.java  # 음성 채널 입장 시 입장곡 재생
-    │   └── EntrySongUploadHandler.java # 업로드 채널의 mp3 저장
-    ├── model/
-    │   └── EntrySongConfig.java       # 입장곡 설정 데이터 클래스
-    ├── repository/
-    │   ├── EntrySongRepository.java   # 서버별 입장곡 저장소 (JSON 저장/로드)
-    │   └── UploadChannelRepository.java # 서버별 업로드 채널 저장소
-    └── service/
-        ├── EntrySongService.java      # 입장곡 설정, 업로드 파일 규칙
-        ├── EntrySongSource.java       # 입장 시 재생할 입장곡 정보
-        └── LegacyEntrySongMigration.java # 예전 입장곡 데이터 이전
+├── entrysong/                         # 입장곡 기능
+│   ├── EntrySongModule.java           # 시작할 때 예전 데이터 이전도 여기서
+│   ├── command/                       # setentrysong, setentrytime, setuploadchannel
+│   ├── handler/
+│   │   ├── EntrySongJoinHandler.java  # 음성 채널 입장 시 입장곡 재생
+│   │   └── EntrySongUploadHandler.java # 업로드 채널의 mp3 저장
+│   ├── model/
+│   │   └── EntrySongConfig.java       # 입장곡 설정 데이터 클래스
+│   ├── repository/
+│   │   ├── EntrySongRepository.java   # 서버별 입장곡 저장소 (JSON 저장/로드)
+│   │   └── UploadChannelRepository.java # 서버별 업로드 채널 저장소
+│   └── service/
+│       ├── EntrySongService.java      # 입장곡 설정, 업로드 파일 규칙
+│       ├── EntrySongSource.java       # 입장 시 재생할 입장곡 정보
+│       └── LegacyEntrySongMigration.java # 예전 입장곡 데이터 이전
+└── fun/                               # 놀이 기능
+    ├── FunModule.java
+    └── command/                       # dice, pick, ladder, conch
 ```
 
-### 명령어 추가 방법
-1. `SlashCommand`를 구현하는 클래스를 만들고 `data()`에 이름/설명/옵션을, `execute()`에 처리를 작성
-2. `Main`의 `CommandDispatcher` 목록에 추가 (봇이 켜질 때 모든 서버에 자동 등록)
+## 새 기능 추가 방법
+
+기능은 **모듈** 단위로 나뉘어 있습니다. 모듈 하나가 자기 명령어, 버튼, 이벤트 리스너,
+필요한 Gateway Intent, 시작할 때 할 작업을 갖고 있고, `Main.createModules()`에 들어간 모듈만 봇에 들어갑니다.
+
+### 기존 기능에 명령어 추가
+1. 그 기능의 `command/` 폴더에 `SlashCommand`를 구현한 클래스를 만듭니다.
+   - `data()`: 이름, 설명, 옵션
+   - `execute()`: 처리. 서버 확인은 디스패처가 해주므로 `event.getGuild()`를 바로 써도 됩니다.
+     DM에서도 쓰게 하려면 `guildOnly()`가 `false`를 돌려주게 합니다.
+2. 그 기능의 `XxxModule.commands()` 목록에 추가합니다.
+
+### 새 기능(모듈) 추가
+1. 기능 이름으로 패키지를 만들고(예: `quiz/`) `BotModule`을 구현한 `QuizModule`을 만듭니다.
+   필요한 메서드만 구현하면 됩니다.
+
+   ```java
+   public class QuizModule implements BotModule {
+       @Override
+       public List<SlashCommand> commands() {
+           return List.of(new QuizCommand());
+       }
+
+       @Override
+       public List<ButtonHandler> buttonHandlers() {
+           return List.of(new QuizButtonHandler()); // 버튼 ID는 "quiz:정답1" 처럼 "quiz:"로 시작
+       }
+   }
+   ```
+   음성 채널 입장 같은 이벤트는 `listeners()`, 필요한 디스코드 이벤트 종류는 `intents()`,
+   봇이 켜진 뒤 한 번 할 작업은 `onReady()`에 넣습니다.
+2. `Main.createModules()` 목록에 `new QuizModule()`을 추가합니다.
+3. 음악 재생이 필요하면 `EntrySongModule`처럼 생성자로 `music.musicManager()`를 넘겨받습니다.
+4. 설정 파일이 필요하면 `BotConfig.dataFile("quiz.json")` 경로에 `JsonFiles`로 읽고 씁니다.
+
+명령어 이름이나 버튼 ID 앞부분이 다른 기능과 겹치면 봇이 시작할 때 바로 알려주고,
+`MainTest`에서도 실패하므로 테스트로 미리 확인할 수 있습니다.
 
 ---
 
